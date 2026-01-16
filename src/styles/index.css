@@ -1,0 +1,210 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Small app styling */
+html, body, #app { height: 100%; }
+:root {
+    /* App-wide sans font stack */
+    --app-font-sans: "Inter", "Roboto", "PT Sans", "Arial", sans-serif;
+
+    /* Wire Element Plus to use the same family */
+    --el-font-family: var(--app-font-sans);
+
+    /* Base font size for the app */
+    --el-font-size-base: 14px;
+}
+
+html,
+body,
+#app {
+    font-family: var(--app-font-sans);
+    font-size: 14px;
+    font-weight: 400;
+    font-synthesis-weight: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    line-height: 1.45;
+    letter-spacing: 0.011em;
+    /* subtle tracking for readability */
+}
+
+/* Headings */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-family: var(--app-font-sans);
+    font-weight: 600;
+    line-height: 1;
+    margin: 0;
+    color: var(--el-text-color-primary);
+}
+
+h1 {
+    font-size: 1.286rem;
+    /* 18px at 14px base */
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+h2 {
+    font-size: 1.143rem;
+    /* 16px at 14px base */
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+h3 {
+    font-size: 1rem;
+    /* 14px at 14px base */
+    font-weight: 600;
+}
+
+/* Более нейтральные цвета для светлой темы */
+html:not(.dark) {
+    --el-text-color-primary: #4a5568;
+    --el-text-color-regular: #718096;
+    --el-text-color-secondary: #a0aec0;
+}
+
+html:not(.dark) h1,
+html:not(.dark) h2,
+html:not(.dark) h3,
+html:not(.dark) h4,
+html:not(.dark) h5,
+html:not(.dark) h6 {
+    color: #2d3748;
+}
+
+html:not(.dark) body,
+html:not(.dark) #app {
+    color: #4a5568;
+}
+
+/* Dark theme globals */
+html.dark,
+html.dark body,
+html.dark #app {
+    background-color: var(--el-bg-color-page, #0f1115) !important;
+    color: var(--el-text-color-primary, #e5e7eb) !important;
+}
+
+/* Force dark background to the requested color */
+html.dark {
+    --el-bg-color-page: #262c36;
+    --el-bg-color: #262c36;
+    /* Замена цвета зебры (fill) */
+    --el-fill-color: #232833;
+}
+
+/* App layout surfaces in dark */
+html.dark .app-aside {
+    border-right: 1px solid var(--el-border-color, #2b2f36) !important;
+    background-color: var(--el-bg-color) !important;
+}
+
+html.dark .app-content {
+    background-color: var(--el-bg-color) !important;
+}
+
+/* Nice dark scrollbars */
+html.dark ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+html.dark ::-webkit-scrollbar-track {
+    background: var(--el-fill-color-darker);
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+    background: var(--el-fill-color);
+    border: 1px solid var(--el-border-color);
+    border-radius: 6px;
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+    background: var(--el-color-primary-light-5);
+}
+
+/* Стили для кнопок без type в темной теме */
+html.dark .el-button:not(.el-button--primary):not(.el-button--success):not(.el-button--info):not(.el-button--warning):not(.el-button--danger):not(.el-button--text) {
+    background-color: var(--el-bg-color) !important;
+    border-color: var(--el-border-color) !important;
+    color: var(--el-text-color-primary) !important;
+}
+
+html.dark .el-button:not(.el-button--primary):not(.el-button--success):not(.el-button--info):not(.el-button--warning):not(.el-button--danger):not(.el-button--text):hover {
+    background-color: var(--el-fill-color) !important;
+    border-color: var(--el-border-color-light) !important;
+    color: var(--el-text-color-primary) !important;
+}
+
+/* Стили для input в темной теме */
+html.dark .el-input--large .el-input__wrapper {
+    padding: 1px 15px !important;
+}
+
+/* Ensure common form controls inherit the global font */
+input,
+button,
+select,
+textarea,
+.el-button,
+.el-input__inner,
+.el-select__selected-item,
+.el-select-dropdown__item {
+    font-family: inherit;
+}
+
+/* El-main padding override */
+.el-main {
+    --el-main-padding: 2px !important;
+    padding: 2px !important;
+}
+
+/* Ensure the main app container uses full height and inner scrolling
+   so page-level scrollbar doesn't appear due to padding. */
+.body-page {
+    height: 100%;
+    box-sizing: border-box;
+}
+.body-main {
+    height: 100%;
+    overflow: auto;
+}
+
+/* Global Element Plus dialog styles */
+/* Increase dialog width by ~30% vs default 50% (use 65vw) and unify paddings */
+.el-overlay .el-dialog {
+    width: 65vw !important;
+    max-width: 1200px;
+}
+
+.el-dialog__header,
+.el-dialog__body,
+.el-dialog__footer {
+    padding: 20px !important;
+}
+
+/* Optional: tighter width on small screens */
+@media (max-width: 768px) {
+    .el-overlay .el-dialog {
+        width: 90vw !important;
+        max-width: none;
+    }
+}
+
+/* Ensure icon components align vertically with adjacent text */
+.el-icon {
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+}
+.el-icon svg {
+    display: block; /* remove inline-gap to avoid slight baseline shift */
+}
