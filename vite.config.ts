@@ -7,6 +7,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 const projectRoot = fileURLToPath(new URL('.', import.meta.url))
 
 export default defineConfig({
+  base: './',
   resolve: {
     alias: {
       fs: resolve(projectRoot, 'src/shims/fs-browser.ts'),
