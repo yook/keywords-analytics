@@ -90,7 +90,13 @@
 import { ref, onMounted } from "vue";
 import { i18n } from "../i18n";
 import { useProjectStore } from "../stores/project";
-import { Setting, PriceTag, Plus, Filter, CircleCheck } from "@element-plus/icons-vue";
+import {
+  Setting,
+  PriceTag,
+  Plus,
+  Filter,
+  CircleCheck,
+} from "@element-plus/icons-vue";
 const project = useProjectStore();
 
 onMounted(() => {
