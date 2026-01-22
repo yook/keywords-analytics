@@ -1,189 +1,93 @@
 import { defineStore } from 'pinia'
 import { useDexie } from '../composables/useDexie'
 
-type ProjectItem = { value: string; label: string; url?: string }
-
-function parseQueryResult(res: any) {
-  if (!res) return []
-  try {
-    let cur: any = res
-    // attempt to unwrap wrappers up to a few levels
-    for (let i = 0; i < 5; i++) {
-      // if table-like with batches, collect arrays from batches
-      if (cur && cur.batches && Array.isArray(cur.batches) && cur.batches.length > 0) {
-        const out: any[] = []
-        for (const b of cur.batches) {
-          if (!b) continue
-          if (typeof b.toArray === 'function') {
-            try {
-              const a = b.toArray()
-              if (Array.isArray(a) && a.length > 0) out.push(...a)
-            } catch (e) {}
-          } else if (b.data && Array.isArray(b.data)) {
-            out.push(...b.data)
-          }
-        }
-        if (out.length > 0) return out
-      }
-
-      // if object has toArray()
-      if (cur && typeof cur.toArray === 'function') {
-        try {
-          const arr = cur.toArray()
-          if (Array.isArray(arr) && arr.length > 0) {
-            cur = arr
-            continue
-          }
-        } catch (e) {
-          // ignore and continue
-        }
-      }
-
-      // if array wrapper of a single element, unwrap it
-      if (Array.isArray(cur) && cur.length === 1) {
-        const first = cur[0]
-        if (first && typeof first.toArray === 'function') {
-          try {
-            const a = first.toArray()
-            if (Array.isArray(a)) {
-              cur = a
-              continue
-            }
-          } catch (e) {}
-        }
-        if (first && first.data && Array.isArray(first.data)) {
-          cur = first.data
-          continue
-        }
-      }
-
-      // if array of items where each item is a wrapper, try to unwrap elements
-      if (Array.isArray(cur)) {
-        const out: any[] = []
-        let changed = false
-        for (const item of cur) {
-          if (item && typeof item.toArray === 'function') {
-            try {
-              const a = item.toArray()
-              if (Array.isArray(a) && a.length > 0) {
-                out.push(...a)
-                changed = true
-                continue
-              }
-            } catch (e) {}
-          }
-          if (item && item.data && Array.isArray(item.data)) {
-            out.push(...item.data)
-            changed = true
-            continue
-          }
-          out.push(item)
-        }
-        if (changed) {
-          cur = out
-          continue
-        }
-      }
-
-      // if object is column-oriented (each key maps to array of column values), convert to row-wise
-      if (cur && typeof cur === 'object' && !Array.isArray(cur)) {
-        const keys = Object.keys(cur)
-        if (keys.length > 0) {
-          const lens = keys.map(k => Array.isArray(cur[k]) ? cur[k].length : -1)
-          const allArrays = lens.every(l => l >= 0)
-          const sameLen = allArrays && lens.every(l => l === lens[0])
-          if (sameLen) {
-            const rows: any[] = []
-            for (let ri = 0; ri < lens[0]; ri++) {
-              const row: any = {}
-              for (const k of keys) row[k] = cur[k][ri]
-              rows.push(row)
-            }
-            cur = rows
-            continue
-          }
-        }
-      }
-
-      break
-    }
-
-    if (Array.isArray(cur)) return cur
-    if (cur && cur.data && Array.isArray(cur.data)) return cur.data
-  } catch (e) {
-    console.warn('parseQueryResult unexpected shape', e)
-  }
-  return []
-}
+type ProjectItem = { value: string; label: string; url?: string; data?: any }
 
 export const useProjectStore = defineStore('project', {
   state: () => ({
     projectsList: [] as ProjectItem[],
     // compatibility: alias used by newer components
     projectsLoaded: false as boolean,
-    currentProjectId: null as string | null,
+    currentProjectId: localStorage.getItem('currentProjectId') as string | null,
     activePage: (localStorage.getItem('activeMenuItem') || '2') as string,
     openaiApiKey: (localStorage.getItem('openaiApiKey') || '') as string,
+    data: {} as any,
   }),
   actions: {
     async getProjects() {
-      // Load projects from DuckDB (WASM). Fallback to empty list on error.
       try {
         const db = useDexie()
         await db.init()
         const res = await db.getProjects()
-        console.log('[project.ts] getProjects SELECT result:', res)
-        let rows = Array.isArray(res) ? res : parseQueryResult(res)
-          // handle edge-case: single _Data-like wrapper remained — try to extract its array
-          try {
-            if (Array.isArray(rows) && rows.length === 1) {
-              const first = rows[0]
-              if (first && typeof first.toArray === 'function') {
-                try {
-                  const a = first.toArray()
-                  if (Array.isArray(a) && a.length > 0) rows = a
-                } catch (e) {
-                  console.warn('getProjects: failed toArray() on wrapper', e)
-                }
-              } else if (first && first.data && Array.isArray(first.data)) {
-                rows = first.data
-              }
-            }
-          } catch (e) {
-            console.warn('getProjects: post-parse normalization failed', e)
+        console.log('[ProjectStore] getProjects response:', res)
+        
+        const rows = Array.isArray(res) ? res : []
+        
+        this.projectsList = rows.map((r: any) => {
+          return { 
+            value: String(r.id), 
+            label: String(r.name || ''), 
+            url: String(r.url || ''),
+            data: r.data || {}
           }
-          console.log('[project.ts] getProjects parsed rows:', rows)
-          this.projectsList = rows.map((r: any, idx: number) => {
-            if (Array.isArray(r)) return { value: String(r[0]), label: String(r[1]), url: r[2] || '' }
-            return { value: String(r.id ?? r.ID ?? r.Id ?? r[0] ?? idx), label: String(r.name ?? r.NAME ?? r.Name ?? r[1] ?? ''), url: r.url ?? r.URL ?? '' }
-          }).filter(p => p.value !== '0')
-          console.log('[project.ts] getProjects final mapped projectsList:', this.projectsList)
-        // Dexie handles connections itself
+        }).filter(p => p.value && p.value !== 'undefined')
+        
+        console.log('[ProjectStore] projectsList updated:', JSON.parse(JSON.stringify(this.projectsList)))
       } catch (e) {
+        console.error('[ProjectStore] getProjects failed:', e)
         this.projectsList = []
       }
-      if (this.currentProjectId == null && this.projectsList.length > 0) {
-        this.currentProjectId = this.projectsList[0].value
+      
+      if (this.projectsList.length > 0) {
+        if (!this.currentProjectId) {
+          this.currentProjectId = this.projectsList[0].value;
+        } else {
+          const exists = this.projectsList.some(p => p.value === this.currentProjectId);
+          if (!exists) {
+            this.currentProjectId = this.projectsList[0].value;
+          }
+        }
+        const cur = this.projectsList.find(p => String(p.value) === String(this.currentProjectId))
+        if (cur) {
+          this.data = cur.data || {}
+        }
+      } else {
+        this.data = {}
       }
       this.projectsLoaded = true
+      localStorage.setItem('currentProjectId', this.currentProjectId || '')
     },
 
     async saveProjects() {
       try {
         const db = useDexie()
         await db.init()
-        const normalized = this.projectsList.map(p => ({ id: p.value, name: p.label, url: p.url || '' }))
+        
+        if (this.currentProjectId) {
+          const idx = this.projectsList.findIndex(p => String(p.value) === String(this.currentProjectId))
+          if (idx !== -1) {
+            this.projectsList[idx].data = { ...this.data }
+          }
+        }
+
+        const normalized = this.projectsList.map(p => ({ 
+          id: String(p.value), 
+          name: String(p.label), 
+          url: String(p.url || ''),
+          data: p.data || {}
+        }))
+        
+        console.log('[ProjectStore] saving projects to DB:', normalized)
         await db.saveProjects(normalized)
-        try { await db.persistToIndexedDB() } catch (e) { console.warn(e) }
       } catch (e) {
-        console.warn('saveProjects failed', e)
+        console.error('[ProjectStore] saveProjects failed:', e)
       }
     },
 
     // Save a new project object (compatibility with enhanced dialog)
     async saveNewProject(payload: { name: string; url?: string }) {
       const id = String(Date.now())
-      const item = { value: id, label: payload.name, url: payload.url || '' }
+      const item = { value: id, label: payload.name, url: payload.url || '', data: {} }
       try {
         const db = useDexie()
         await db.init()
@@ -203,7 +107,7 @@ export const useProjectStore = defineStore('project', {
 
     async addProject(label: string) {
       const id = String(Date.now())
-      const item = { value: id, label, url: '' }
+      const item = { value: id, label, url: '', data: {} }
       try {
         const db = useDexie()
         await db.init()
@@ -220,7 +124,23 @@ export const useProjectStore = defineStore('project', {
     },
 
     changeProject(id: string | null) {
+      // Sync current data back to the list before switching
+      if (this.currentProjectId) {
+        const oldIdx = this.projectsList.findIndex(p => String(p.value) === String(this.currentProjectId))
+        if (oldIdx !== -1) {
+          this.projectsList[oldIdx].data = { ...this.data }
+        }
+      }
+
       this.currentProjectId = id
+      
+      // Load new data
+      const newIdx = this.projectsList.findIndex(p => String(p.value) === String(id))
+      if (newIdx !== -1) {
+        this.data = this.projectsList[newIdx].data || {}
+      } else {
+        this.data = {}
+      }
     },
 
     async getOpenaiApiKey() {
@@ -231,6 +151,68 @@ export const useProjectStore = defineStore('project', {
         return key;
       }
       return '';
+    },
+
+    async deleteProject(id: string) {
+      try {
+        const db = useDexie()
+        await db.init()
+        await db.deleteProject(id)
+        
+        // Update in-memory list
+        this.projectsList = this.projectsList.filter(p => String(p.value) !== String(id))
+        
+        // If we deleted the current project, switch to another or null
+        if (String(this.currentProjectId) === String(id)) {
+          if (this.projectsList.length > 0) {
+            this.currentProjectId = this.projectsList[0].value
+          } else {
+            this.currentProjectId = null
+          }
+          if (this.currentProjectId) {
+            localStorage.setItem('currentProjectId', this.currentProjectId)
+          } else {
+            localStorage.removeItem('currentProjectId')
+          }
+        }
+      } catch (e) {
+        console.warn('deleteProject failed', e)
+        throw e
+      }
+    },
+
+    async updateProject(payload: { id: string | null, name: string }) {
+      if (!payload.id) return;
+      try {
+        const db = useDexie()
+        await db.init()
+        
+        // Fetch existing projects to get the one we want to update
+        const projects = await db.getProjects()
+        const existing = projects.find(p => String(p.id) === String(payload.id))
+        
+        const updated = {
+          id: String(payload.id),
+          name: payload.name,
+          url: existing ? (existing.url || '') : '',
+          data: existing ? (existing.data || {}) : {}
+        }
+        
+        await db.addOrUpdateProject(updated)
+        
+        // Update in-memory
+        const idx = this.projectsList.findIndex(p => String(p.value) === String(payload.id))
+        if (idx !== -1) {
+          this.projectsList[idx].label = payload.name
+        }
+      } catch (e) {
+        console.warn('updateProject failed', e)
+        throw e
+      }
+    },
+
+    async refreshProjectsList() {
+      return this.getProjects()
     }
   },
 })

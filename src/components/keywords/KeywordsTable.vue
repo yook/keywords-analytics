@@ -147,19 +147,26 @@ const allColumns = [
 
 // Ключи всех доступных колонок
 const allColumnKeys = allColumns.map((c) => c.prop);
-// По умолчанию включаем только эти колонки
-const defaultColumnKeys = [
-  "keyword",
-  "created_at",
-  "lemma",
-  "tags",
-  "classification_label",
-  "classification_score",
-];
+
+const getDefaultColumnsForScope = (scope) => {
+  switch (scope) {
+    case "keywords-filter":
+      return ["target_query", "blocking_rule"];
+    case "keywords-typing":
+      return ["classification_label", "classification_score"];
+    case "keywords-clustering":
+      return ["cluster_label", "cluster_score"];
+    case "keywords-consistency":
+      return ["is_valid_headline", "validation_reason"];
+    default:
+      return ["created_at", "lemma", "tags"];
+  }
+};
+
 const props = defineProps({
   activeColumns: {
     type: Array,
-    default: () => ["keyword", "created_at", "lemma", "tags"],
+    default: null,
   },
   columnsKey: {
     type: String,
@@ -256,7 +263,7 @@ function hydrateColumns() {
     // ignore
   }
 
-  applyColumns(defaultColumnKeys);
+  applyColumns(getDefaultColumnsForScope(columnsStorageKey.value));
 }
 
 // hydrateColumns(); // Больше не вызываем здесь, чтобы не перезаписывать currentTableColumns при маунте
@@ -298,13 +305,10 @@ watch(
   { deep: false },
 );
 
-// При смене проекта поднимаем порядок колонок из БД/хранилища проекта
-watch(
-  () => project.currentProjectId,
-  () => {
-    hydrateColumns();
-  },
-);
+// При смене проекта или загрузке списка проектов поднимаем порядок колонок
+watch([() => project.currentProjectId, () => project.projectsLoaded], () => {
+  hydrateColumns();
+});
 
 // Когда из БД приезжают настройки колонок нового проекта (project.data.columns),
 // повторно применяем порядок/видимость, чтобы не брать кеш от предыдущего проекта.

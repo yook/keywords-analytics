@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, defineAsyncComponent } from "vue";
+import { computed, onMounted, defineAsyncComponent, watch } from "vue";
 import { useProjectStore } from "./stores/project";
 import { useConsistencyWorker } from "./composables/useConsistencyWorker";
 import { useMorphologyWorker } from "./composables/useMorphologyWorker";
@@ -35,6 +35,22 @@ onMounted(() => {
   morphologyWorker.ensure();
   consistencyWorker.ensure();
 });
+
+// Persist active project and page
+watch(
+  () => project.currentProjectId,
+  (newId) => {
+    if (newId) localStorage.setItem("currentProjectId", newId);
+    else localStorage.removeItem("currentProjectId");
+  },
+);
+
+watch(
+  () => project.activePage,
+  (newPage) => {
+    if (newPage) localStorage.setItem("activeMenuItem", newPage);
+  },
+);
 
 const currentPageComponent = computed(() => {
   switch (project.activePage) {

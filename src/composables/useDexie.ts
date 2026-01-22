@@ -1,7 +1,7 @@
 import Dexie from 'dexie'
 import { ref } from 'vue'
 
-type Project = { id: string; name: string; url?: string }
+type Project = { id: string; name: string; url?: string; data?: any }
 type Keyword = {
   id: string;
   projectId?: string;
@@ -70,7 +70,7 @@ class AppDB extends Dexie {
     super('app-db')
     // initial schema
     this.version(1).stores({
-      projects: '&id,name,url',
+      projects: '&id,name,url,data',
       greetings: '++id,text',
     })
     // add keywords in version 2 (upgrade path for existing DBs)
@@ -92,6 +92,16 @@ class AppDB extends Dexie {
     })
     // add classification_models in version 6 for storing trained models per project
     this.version(6).stores({
+      classification_models: '&id,projectId,created_at,updated_at',
+    })
+
+    // version 7: ensure projects has data field and other tables are consistent
+    this.version(7).stores({
+      projects: '&id,name,url,data',
+      keywords: '&id,projectId,keyword,created_at,lemma,tags,morphology_processed,[projectId+created_at],[projectId+keyword]',
+      stopwords: '&id,projectId,word,created_at,[projectId+word]',
+      typing_samples: '&id,projectId,label,created_at,[projectId+label]',
+      embeddings_cache: '&id,key,vector_model,created_at,[key+vector_model]',
       classification_models: '&id,projectId,created_at,updated_at',
     })
   }
@@ -174,7 +184,23 @@ export function useDexie() {
 
   async function deleteProject(id: string) {
     const db = await init()
-    await db.projects.delete(id)
+    const pid = String(id)
+    try {
+      // 1. Delete associated data from other tables
+      if (db.keywords) await db.keywords.where('projectId').equals(pid).delete()
+      if (db.stopwords) await db.stopwords.where('projectId').equals(pid).delete()
+      if (db.typing_samples) await db.typing_samples.where('projectId').equals(pid).delete()
+      if (db.classification_models) await db.classification_models.where('projectId').equals(pid).delete()
+      
+      // 2. Delete project itself
+      await db.projects.delete(pid)
+    } catch (e) {
+      console.warn('deleteProject failed partially', e)
+      // Attempt project deletion anyway if specific table deletes failed
+      try {
+        await db.projects.delete(pid)
+      } catch (er) {}
+    }
   }
 
   async function getGreetings() {
