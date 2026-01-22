@@ -50,7 +50,7 @@ self.addEventListener('message', async (event) => {
         const raw: string = payload.raw
         const projectId: string = payload.projectId || 'anon'
         const chunkSize: number = Number(payload.chunkSize) || 2000
-        const parts = raw.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
+        const parts = raw.split(/[\n,]+/).map(s => s.trim().toLowerCase()).filter(Boolean)
 
         const CHUNK = Math.max(500, Math.min(10000, chunkSize))
 
@@ -58,7 +58,7 @@ self.addEventListener('message', async (event) => {
         const idSet = new Set<string>()
         for (let i = 0; i < parts.length; i++) {
           const k = parts[i]
-          const id = `${projectId}::${encodeURIComponent(k.trim().toLowerCase())}`
+          const id = `${projectId}::${encodeURIComponent(k)}`
           idSet.add(id)
         }
         const totalUnique = idSet.size
@@ -68,7 +68,7 @@ self.addEventListener('message', async (event) => {
         let currentChunk: Keyword[] = []
         for (let i = 0; i < parts.length; i++) {
           const k = parts[i]
-          const id = `${projectId}::${encodeURIComponent(k.trim().toLowerCase())}`
+          const id = `${projectId}::${encodeURIComponent(k)}`
           if (!idSet.has(id)) continue
           idSet.delete(id)
           // One timestamp per chunk

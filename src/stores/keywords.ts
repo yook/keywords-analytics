@@ -146,7 +146,7 @@ export const useKeywordsStore = defineStore('keywords', {
     async addKeywords(raw: string) {
       const parts = raw
         .split(/[,\n]+/)
-        .map((s) => s.trim())
+        .map((s) => s.trim().toLowerCase())
         .filter(Boolean)
       if (!parts.length) {
         ElMessage.warning('Введите ключевые запросы')
@@ -161,7 +161,7 @@ export const useKeywordsStore = defineStore('keywords', {
       // Build a small preview for UI only (avoid creating full array of 100k items in main)
       const previewParts = parts.slice(0, UI_PRELOAD)
       const previewItems = previewParts.map((kw) => ({
-        id: `${pid}::${encodeURIComponent(kw.toLowerCase())}`,
+        id: `${pid}::${encodeURIComponent(kw)}`,
         projectId: String(pid),
         keyword: kw,
         created_at: new Date().toISOString(),
@@ -325,9 +325,30 @@ export const useKeywordsStore = defineStore('keywords', {
     },
 
     async deleteKeyword(id: string) {
+      try {
+        const dexie = useDexie()
+        const db = await dexie.init()
+        await (db as any).keywords.delete(id)
+      } catch (e) {
+        console.warn('deleteKeyword failed:', e)
+      }
       this.keywords = this.keywords.filter((k) => k.id !== id)
-      this.keywordCount = this.keywords.length
-      this.totalCount = this.keywordCount
+      this.keywordCount = Math.max(0, this.keywordCount - 1)
+      this.totalCount = Math.max(0, this.totalCount - 1)
+    },
+
+    async deleteAllKeywords(projectId: string) {
+      try {
+        const dexie = useDexie()
+        await dexie.deleteKeywordsByProject(projectId)
+        this.keywords = []
+        this.keywordCount = 0
+        this.totalCount = 0
+        this.windowStart = 0
+      } catch (e) {
+        console.warn('deleteAllKeywords failed:', e)
+        throw e
+      }
     },
 
     // process control stubs

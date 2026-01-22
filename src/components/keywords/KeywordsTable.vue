@@ -37,6 +37,17 @@
           <el-icon><Download /></el-icon>
           .xls
         </el-button>
+
+        <!-- Delete all keywords -->
+        <el-button
+          size="small"
+          type="danger"
+          plain
+          @click="handleDeleteAll"
+          :disabled="keywordsStore.keywordCount === 0"
+        >
+          <el-icon><Delete /></el-icon>
+        </el-button>
       </el-col>
     </el-row>
 
@@ -92,7 +103,7 @@ import { ref, computed, onMounted, watch, nextTick, defineProps } from "vue";
 import { useKeywordsStore } from "../../stores/keywords";
 import { useProjectStore } from "../../stores/project";
 import { Search, Delete, Download, Grid } from "@element-plus/icons-vue";
-import { ElMessageBox } from "element-plus";
+import { ElMessageBox, ElMessage } from "element-plus";
 import { markRaw } from "vue";
 import { useI18n } from "vue-i18n";
 import { downloadKeywords } from "../../stores/export";
@@ -374,8 +385,32 @@ const handleDeleteRow = (row) => {
 };
 
 const handleDeleteAll = () => {
-  // Логика удаления всех строк
-  console.log("Delete all rows");
+  ElMessageBox.confirm(
+    "Вы уверены, что хотите удалить все ключевые фразы и связанные с ними данные для этого проекта? Это действие необратимо.",
+    "Удаление всех данных",
+    {
+      confirmButtonText: "Удалить все",
+      cancelButtonText: "Отмена",
+      type: "error",
+      icon: markRaw(Delete),
+      customClass: "delete-msgbox-class",
+    },
+  )
+    .then(async () => {
+      if (project.currentProjectId) {
+        try {
+          await keywordsStore.deleteAllKeywords(
+            String(project.currentProjectId),
+          );
+          ElMessage.success("Все данные успешно удалены");
+        } catch (e) {
+          ElMessage.error("Ошибка при удалении данных");
+        }
+      }
+    })
+    .catch(() => {
+      // Отмена
+    });
 };
 
 // Экспорт ключевых слов в XLSX
@@ -553,5 +588,10 @@ html.dark .el-input--small .el-input__wrapper.is-focus {
 
 html.dark .el-input--small .el-input__inner::placeholder {
   color: var(--el-text-color-placeholder) !important;
+}
+
+.delete-msgbox-class {
+  width: 800px !important;
+  max-width: 90%;
 }
 </style>
