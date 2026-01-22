@@ -2338,7 +2338,7 @@ function saveColumnWidth(columnProp, width) {
 
   // Only save to database when resizing is complete to avoid too many updates
   if (!resizing.value) {
-    project.updateProject();
+    project.saveProjectData()
   }
 }
 

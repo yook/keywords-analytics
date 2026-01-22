@@ -79,6 +79,7 @@ export const useProjectStore = defineStore('project', {
         
         console.log('[ProjectStore] saving projects to DB:', normalized)
         await db.saveProjects(normalized)
+        try { await db.persistToIndexedDB() } catch (e) { console.warn('persist failed', e) }
       } catch (e) {
         console.error('[ProjectStore] saveProjects failed:', e)
       }
@@ -199,6 +200,7 @@ export const useProjectStore = defineStore('project', {
         }
         
         await db.addOrUpdateProject(updated)
+        try { await db.persistToIndexedDB() } catch (e) { console.warn('persist failed', e) }
         
         // Update in-memory
         const idx = this.projectsList.findIndex(p => String(p.value) === String(payload.id))
@@ -207,6 +209,40 @@ export const useProjectStore = defineStore('project', {
         }
       } catch (e) {
         console.warn('updateProject failed', e)
+        throw e
+      }
+    },
+
+    // Save project data/settings without needing to pass the name
+    async saveProjectData(projectId?: string) {
+      const id = projectId || this.currentProjectId
+      if (!id) return;
+      try {
+        const db = useDexie()
+        await db.init()
+        
+        // Fetch existing project to get the current name
+        const projects = await db.getProjects()
+        const existing = projects.find(p => String(p.id) === String(id))
+        if (!existing) return;
+        
+        const updated = {
+          id: String(id),
+          name: existing.name,
+          url: existing.url || '',
+          data: { ...this.data }
+        }
+        
+        await db.addOrUpdateProject(updated)
+        try { await db.persistToIndexedDB() } catch (e) { console.warn('persist failed', e) }
+        
+        // Update in-memory
+        const idx = this.projectsList.findIndex(p => String(p.value) === String(id))
+        if (idx !== -1) {
+          this.projectsList[idx].data = { ...this.data }
+        }
+      } catch (e) {
+        console.warn('saveProjectData failed', e)
         throw e
       }
     },
