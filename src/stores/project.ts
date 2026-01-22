@@ -123,6 +123,7 @@ export const useProjectStore = defineStore('project', {
     projectsLoaded: false as boolean,
     currentProjectId: null as string | null,
     activePage: (localStorage.getItem('activeMenuItem') || '2') as string,
+    openaiApiKey: (localStorage.getItem('openaiApiKey') || '') as string,
   }),
   actions: {
     async getProjects() {
@@ -133,7 +134,6 @@ export const useProjectStore = defineStore('project', {
         const res = await db.getProjects()
         console.log('[project.ts] getProjects SELECT result:', res)
         let rows = Array.isArray(res) ? res : parseQueryResult(res)
-        
           // handle edge-case: single _Data-like wrapper remained — try to extract its array
           try {
             if (Array.isArray(rows) && rows.length === 1) {
@@ -160,7 +160,6 @@ export const useProjectStore = defineStore('project', {
           console.log('[project.ts] getProjects final mapped projectsList:', this.projectsList)
         // Dexie handles connections itself
       } catch (e) {
-        // On DB error, fall back to empty list
         this.projectsList = []
       }
       if (this.currentProjectId == null && this.projectsList.length > 0) {
@@ -199,44 +198,7 @@ export const useProjectStore = defineStore('project', {
       this.currentProjectId = id
       this.projectsLoaded = true
       console.info(`проект ${payload.name} сохранен`, this.projectsList)
-      
       return id
-    },
-
-    // Backwards-compatible stub used by legacy components that expect a paged/sorted DB fetch
-    // In PWA mode this acts as a safe no-op that returns an empty result set quickly.
-    async getsortedDb(sort?: any) {
-      try {
-        // Mark loading to preserve UI expectations
-        (this as any).tableLoading = true
-        // Best-effort: attempt to read tableData if present
-        const data = (this as any).tableData || []
-        // Optionally apply very simple in-memory sort if `sort` provided
-        if (sort && typeof sort === 'object' && Array.isArray(data) && data.length > 0) {
-          try {
-            // naive sort: pick first key
-            const key = Object.keys(sort)[0]
-            if (key) {
-              data.sort((a: any, b: any) => (a[key] > b[key] ? 1 : a[key] < b[key] ? -1 : 0))
-            }
-          } catch (e) {}
-        }
-        (this as any).tableLoading = false
-        return { rows: data, total: data.length }
-      } catch (e) {
-        (this as any).tableLoading = false
-        return { rows: [], total: 0 }
-      }
-    },
-
-    // Compatibility alias (some code calls getsortedDb, others may call getSortedDb)
-    getSortedDb(sort?: any) {
-      return (this as any).getsortedDb(sort)
-    },
-
-    // Simple helper to change current page number
-    changeCurrentPageNumber(n?: number) {
-      (this as any).currentPage = typeof n === 'number' ? n : 1
     },
 
     async addProject(label: string) {
@@ -254,73 +216,21 @@ export const useProjectStore = defineStore('project', {
       this.projectsList.unshift(item)
       this.currentProjectId = id
       console.info(`проект ${label} сохранен`, this.projectsList)
-      
       return id
-    },
-
-    // Delete a project by id and update in-memory list
-    async deleteProject(id?: string) {
-      try {
-        const targetId = id || this.currentProjectId
-        if (!targetId) return
-        const db = useDexie()
-        await db.init()
-        try {
-          // Delete keywords (and related data) for this project first
-          if (typeof (db as any).deleteKeywordsByProject === 'function') {
-            try { await (db as any).deleteKeywordsByProject(String(targetId)) } catch (e) { console.warn('deleteKeywordsByProject failed', e) }
-          }
-          await db.deleteProject(String(targetId))
-        } catch (e) {
-          console.warn('deleteProject DB call failed', e)
-        }
-        // Remove from in-memory list
-        this.projectsList = (this.projectsList || []).filter(p => String(p.value) !== String(targetId))
-        // If deleted current, switch to first available
-        if (String(this.currentProjectId) === String(targetId)) {
-          this.currentProjectId = this.projectsList.length ? this.projectsList[0].value : null
-        }
-        try { await db.persistToIndexedDB() } catch (e) { console.warn('persist failed', e) }
-      } catch (e) {
-        console.warn('deleteProject failed', e)
-      }
-    },
-
-    // Convenience alias to refresh projects list
-    async refreshProjectsList() {
-      return await this.getProjects()
     },
 
     changeProject(id: string | null) {
       this.currentProjectId = id
     },
 
-    // Persist current project metadata (e.g., column widths) to DB
-    async updateProject(payload?: any) {
-      try {
-        // Prefer explicit payload if provided
-        const pd = payload || (this as any).data || null
-        if (!pd || !pd.id) {
-          // Fallback to currentProjectId and find project label from list
-          const id = this.currentProjectId
-          if (!id) return
-          const name = (this.projectsList || []).find((p: any) => p.value === String(id))?.label || ''
-          const toSave = { id: String(id), name, url: '', data: pd || {} }
-          const db = useDexie()
-          await db.init()
-          await db.addOrUpdateProject(toSave)
-          try { await db.persistToIndexedDB() } catch (e) { console.warn('persist failed', e) }
-          return
-        }
-
-        const toSave = { id: String(pd.id), name: pd.name || '', url: pd.url || '', data: pd }
-        const db = useDexie()
-        await db.init()
-        await db.addOrUpdateProject(toSave)
-        try { await db.persistToIndexedDB() } catch (e) { console.warn('persist failed', e) }
-      } catch (e) {
-        console.warn('updateProject failed', e)
+    async getOpenaiApiKey() {
+      if (this.openaiApiKey) return this.openaiApiKey;
+      const key = localStorage.getItem('openaiKey_global');
+      if (key) {
+        this.openaiApiKey = key;
+        return key;
       }
-    },
+      return '';
+    }
   },
 })

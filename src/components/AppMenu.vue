@@ -15,6 +15,7 @@
             project.activePage === '2' ||
             project.activePage === 'filter' ||
             project.activePage === 'typing' ||
+            project.activePage === 'clustering' ||
             project.activePage === 'consistency',
         }"
       >
@@ -25,29 +26,52 @@
         <el-menu-item
           :index="'2-0'"
           :class="{ 'is-active': project.activePage === '2' }"
-          >Ключевые запросы</el-menu-item
         >
+          <el-icon><Plus /></el-icon>
+          <span>Добавить запросы</span>
+        </el-menu-item>
         <el-menu-item-group title="Морфолгический поиск">
           <el-menu-item
             :index="'2-1'"
             :class="{ 'is-active': project.activePage === 'filter' }"
-            >Фильтр по стоп-словам</el-menu-item
           >
+            <el-icon><Filter /></el-icon>
+            <span>Фильтр по стоп-словам</span>
+          </el-menu-item>
           <el-menu-item
             :index="'2-2'"
             :class="{ 'is-active': project.activePage === 'consistency' }"
-            >Проверка согласованности</el-menu-item
           >
+            <el-icon><CircleCheck /></el-icon>
+            <span>Проверка согласованности</span>
+          </el-menu-item>
         </el-menu-item-group>
 
         <el-menu-item-group title="Векторный поиск">
           <el-menu-item
             :index="'2-3'"
             :class="{ 'is-active': project.activePage === 'typing' }"
-            >Определение класса</el-menu-item
           >
-          <el-menu-item :index="'2-4'">Распределение на кластеры</el-menu-item>
-          <el-menu-item :index="'2-5'">Присвоение категории</el-menu-item>
+            <el-icon
+              ><img src="/icons8-sparkling-24.png" style="width: 18px"
+            /></el-icon>
+            <span>Определение класса</span>
+          </el-menu-item>
+          <el-menu-item
+            :index="'2-4'"
+            :class="{ 'is-active': project.activePage === 'clustering' }"
+          >
+            <el-icon
+              ><img src="/icons8-sparkling-24.png" style="width: 18px"
+            /></el-icon>
+            <span>Распределение на кластеры</span>
+          </el-menu-item>
+          <el-menu-item :index="'2-5'" disabled>
+            <el-icon
+              ><img src="/icons8-sparkling-24.png" style="width: 18px"
+            /></el-icon>
+            <span>Присвоение категории</span>
+          </el-menu-item>
         </el-menu-item-group>
       </el-sub-menu>
 
@@ -66,7 +90,7 @@
 import { ref, onMounted } from "vue";
 import { i18n } from "../i18n";
 import { useProjectStore } from "../stores/project";
-import { Setting, PriceTag, Connection } from "@element-plus/icons-vue";
+import { Setting, PriceTag, Plus, Filter, CircleCheck } from "@element-plus/icons-vue";
 const project = useProjectStore();
 
 onMounted(() => {
@@ -99,6 +123,12 @@ const handleMenuSelect = (index) => {
     if (index === "2-3") {
       project.activePage = "typing";
       localStorage.setItem("activeMenuItem", "typing");
+      return;
+    }
+    // Special case: open clustering page for распределение на кластеры
+    if (index === "2-4") {
+      project.activePage = "clustering";
+      localStorage.setItem("activeMenuItem", "clustering");
       return;
     }
     // Default: open config dialog for other tabs

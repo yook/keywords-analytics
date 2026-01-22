@@ -64,18 +64,18 @@
             pageType === "isAddingWithProgress"
               ? "Добавить ключевые запросы"
               : pageType === "stopwordsRunning"
-              ? "Фильтровать по стоп-словам"
-              : pageType === "categorizationRunning"
-              ? "Запустить категоризацию"
-              : pageType === "typingRunning"
-              ? "Запустить определение класса"
-              : pageType === "clusteringRunning"
-              ? "Запустить кластеризацию"
-              : pageType === "morphologyRunning"
-              ? "Запустить лемматизацию"
-              : pageType === "morphologyCheckRunning"
-              ? "Запустить проверку согласованности"
-              : "Запустить процесс"
+                ? "Фильтровать по стоп-словам"
+                : pageType === "categorizationRunning"
+                  ? "Запустить категоризацию"
+                  : pageType === "typingRunning"
+                    ? "Определение класса"
+                    : pageType === "clusteringRunning"
+                      ? "Запустить кластеризацию"
+                      : pageType === "morphologyRunning"
+                        ? "Запустить лемматизацию"
+                        : pageType === "morphologyCheckRunning"
+                          ? "Запустить проверку согласованности"
+                          : "Запустить процесс"
           }}
         </el-button>
       </div>
@@ -93,6 +93,13 @@
       width="500px"
     >
       <TypingConfig @close-dialog="typingConfigDialogVisible = false" />
+    </el-dialog>
+    <el-dialog
+      v-model="clusteringConfigDialogVisible"
+      title="Распределение на кластеры"
+      width="500px"
+    >
+      <ClusteringConfig @close-dialog="clusteringConfigDialogVisible = false" />
     </el-dialog>
     <el-dialog
       v-model="dialogVisible"
@@ -168,7 +175,8 @@ import { CirclePlus, VideoPlay, VideoPause } from "@element-plus/icons-vue";
 import { useProjectStore } from "../../stores/project";
 import { useKeywordsStore } from "../../stores/keywords";
 import StopWords from "./settings/StopWords.vue";
-import TypingConfig from "./settings/TypingConfig.vue";
+import TypingConfig from "./settings/ClassificationConfig.vue";
+import ClusteringConfig from "./settings/ClusteringConfig.vue";
 
 const project = useProjectStore();
 const keywordsStore = useKeywordsStore();
@@ -183,6 +191,7 @@ const props = defineProps({
 const dialogVisible = ref(false);
 const stopWordsDialogVisible = ref(false);
 const typingConfigDialogVisible = ref(false);
+const clusteringConfigDialogVisible = ref(false);
 const handlePrimaryAction = () => {
   if (props.pageType === "stopwordsRunning") {
     stopWordsDialogVisible.value = true;
@@ -190,6 +199,10 @@ const handlePrimaryAction = () => {
   }
   if (props.pageType === "typingRunning") {
     typingConfigDialogVisible.value = true;
+    return;
+  }
+  if (props.pageType === "clusteringRunning") {
+    clusteringConfigDialogVisible.value = true;
     return;
   }
   if (props.pageType === "morphologyCheckRunning") {
@@ -204,15 +217,51 @@ const processLabel = computed(() => {
   if (keywordsStore.isAddingWithProgress) return "Добавление ключевых запросов";
   if (keywordsStore.categorizationRunning) return "Категоризация";
   if (keywordsStore.typingRunning) return "Определение класса";
-  if (keywordsStore.clusteringRunning) return "Кластеризация";
+  if (keywordsStore.clusteringRunning) {
+    // Detailed clustering stages
+    if (keywordsStore.progress) {
+      switch (keywordsStore.progress.stage) {
+        case "embeddings":
+          return keywordsStore.progress.source === "openai"
+            ? "Получение эмбеддингов [OpenAI]"
+            : "Загрузка эмбеддингов [кэш]";
+        case "building_graph":
+          return "Построение графа сходства";
+        case "clustering":
+          return "Кластеризация";
+        case "dbscan":
+          return "DBSCAN кластеризация";
+        case "saving":
+          return "Сохранение результатов";
+        default:
+          return "Кластеризация";
+      }
+    }
+    return "Кластеризация";
+  }
   if (keywordsStore.stopwordsRunning) return "Фильтр по стоп-словам";
-  if (keywordsStore.morphologyRunning) return "Лемматизация"; // No change needed
+  if (keywordsStore.morphologyRunning) return "Лемматизация";
   if (keywordsStore.morphologyCheckRunning) return "Проверка согласованности";
   return "";
 });
 
 const processedText = computed(() => {
   if (!showProcessInfo.value) return "";
+
+  // Clustering detailed progress
+  if (keywordsStore.clusteringRunning && keywordsStore.progress) {
+    const p = keywordsStore.progress;
+    if (p.total && p.processed !== undefined) {
+      return `${p.processed} из ${p.total}`;
+    }
+    if (p.total && p.fetched !== undefined) {
+      return `${p.fetched} из ${p.total}`;
+    }
+    if (p.percent !== undefined) {
+      return `${Math.round(p.percent)}%`;
+    }
+  }
+
   // For add-with-progress flow prefer the explicit addProgressText (n из m)
   if (keywordsStore.isAddingWithProgress && keywordsStore.addProgressText) {
     return keywordsStore.addProgressText;
@@ -242,11 +291,18 @@ const showProcessInfo = computed(() => {
 
 const currentProgress = computed(() => {
   if (keywordsStore.isAddingWithProgress) return keywordsStore.addProgress;
+  if (keywordsStore.typingRunning) return keywordsStore.typingPercent;
   if (keywordsStore.stopwordsRunning) return keywordsStore.stopwordsPercent;
   if (keywordsStore.morphologyCheckRunning)
     return keywordsStore.morphologyCheckPercent;
   if (keywordsStore.morphologyRunning) return keywordsStore.morphologyPercent;
-  // Можно добавить другие процессы, если есть соответствующие проценты
+
+  // Clustering progress from detailed progress object
+  if (keywordsStore.clusteringRunning && keywordsStore.progress) {
+    return keywordsStore.progress.percent || 0;
+  }
+  if (keywordsStore.clusteringRunning) return keywordsStore.clusteringPercent;
+
   return 0;
 });
 
@@ -278,7 +334,7 @@ async function addKeywords() {
               stopWatcher();
             } catch (e) {}
           }
-        }
+        },
       );
 
       // addKeywords теперь async, стор сам управляет флагом isAddingWithProgress
@@ -301,7 +357,7 @@ async function addKeywords() {
           .catch((err) => {
             console.error(
               "[KeywordsAdd] startMorphology after add failed",
-              err
+              err,
             );
             keywordsStore.targetMorphology = false;
             ElMessage.error("Ошибка при запуске лемматизации");

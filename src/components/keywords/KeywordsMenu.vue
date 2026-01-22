@@ -59,7 +59,7 @@ import { useKeywordsStore } from "../../stores/keywords";
 import StopWords from "./settings/StopWords.vue";
 import CategorizationConfig from "./settings/CategorizationConfig.vue";
 import ClusteringConfig from "./settings/ClusteringConfig.vue";
-import TypingConfig from "./settings/TypingConfig.vue";
+import TypingConfig from "./settings/ClassificationConfig.vue";
 import MorphologyConfig from "./settings/MorphologyConfig.vue";
 
 const { t } = useI18n();
@@ -82,7 +82,7 @@ watch(
         project.crawlerConfigTab = null;
       } catch (e) {}
     }
-  }
+  },
 );
 
 onMounted(() => {
@@ -106,7 +106,7 @@ function deleteData() {
       type: "error",
       icon: markRaw(Delete),
       customClass: "delete-msgbox-class",
-    }
+    },
   )
     .then(() => {
       // Используем keywordsStore для очистки только ключевых слов

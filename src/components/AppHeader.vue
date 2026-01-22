@@ -83,8 +83,8 @@ function changeProject(id: string | null) {
 }
 
 function openIntegrations() {
-  // Integrations feature removed in PWA; route to Settings instead
-  project.activePage = "5";
+  // Open integrations page
+  project.activePage = "integrations";
 }
 </script>
 

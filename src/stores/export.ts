@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-// import ipcClient from "./socket-client";
+// import ipcClient from "./event-bus";
 import { toRaw } from "vue";
 import { useProjectStore } from "./project";
 import moment from "moment";

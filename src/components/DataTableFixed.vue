@@ -184,7 +184,13 @@
                         trigger="click"
                       >
                         <el-tag
-                          type="primary"
+                          :type="
+                            getConfidenceTagType(
+                              column.prop === 'category_info'
+                                ? row.category_similarity
+                                : row.class_similarity,
+                            )
+                          "
                           size="small"
                           style="cursor: pointer"
                         >
@@ -192,29 +198,92 @@
                             formatSimilarity(
                               column.prop === "category_info"
                                 ? row.category_similarity
-                                : row.class_similarity
+                                : row.class_similarity,
                             )
                           }}
                         </el-tag>
                       </el-tooltip>
                     </span>
                   </template>
-                  <template v-else-if="column.prop === 'target_query'">
-                    <el-icon
-                      v-if="row.target_query === 1 || row.target_query === true"
-                      style="color: var(--el-color-success); font-size: 18px"
+                  <template v-else-if="column.prop === 'classification_label'">
+                    <span
+                      v-if="row.classification_label"
+                      class="classification-label"
                     >
-                      <Check />
-                    </el-icon>
-                    <el-icon
-                      v-else-if="
-                        row.target_query === 0 || row.target_query === false
+                      {{ row.classification_label }}
+                    </span>
+                    <span v-else style="color: #909399">—</span>
+                  </template>
+                  <template v-else-if="column.prop === 'classification_score'">
+                    <div class="cell-center">
+                      <el-tag
+                        v-if="
+                          row.classification_score !== null &&
+                          typeof row.classification_score !== 'undefined'
+                        "
+                        size="small"
+                        :type="getConfidenceTagType(row.classification_score)"
+                      >
+                        {{ formatSimilarity(row.classification_score) }}
+                      </el-tag>
+                      <span v-else style="color: #909399">—</span>
+                    </div>
+                  </template>
+                  <template v-else-if="column.prop === 'cluster_label'">
+                    <span
+                      v-if="
+                        row.cluster_label !== null &&
+                        typeof row.cluster_label !== 'undefined' &&
+                        row.cluster_label !== ''
                       "
-                      style="color: var(--el-color-danger); font-size: 18px"
                     >
-                      <Close />
-                    </el-icon>
-                    <span v-else>{{ row.target_query }}</span>
+                      {{ row.cluster_label }}
+                    </span>
+                    <span
+                      v-else-if="
+                        row.cluster !== null &&
+                        typeof row.cluster !== 'undefined'
+                      "
+                    >
+                      {{ row.cluster }}
+                    </span>
+                    <span v-else style="color: #909399">—</span>
+                  </template>
+                  <template v-else-if="column.prop === 'cluster_score'">
+                    <div class="cell-center">
+                      <el-tag
+                        v-if="
+                          row.cluster_score !== null &&
+                          typeof row.cluster_score !== 'undefined'
+                        "
+                        size="small"
+                        :type="getConfidenceTagType(row.cluster_score)"
+                      >
+                        {{ formatSimilarity(row.cluster_score) }}
+                      </el-tag>
+                      <span v-else style="color: #909399">—</span>
+                    </div>
+                  </template>
+                  <template v-else-if="column.prop === 'target_query'">
+                    <div class="cell-center">
+                      <el-icon
+                        v-if="
+                          row.target_query === 1 || row.target_query === true
+                        "
+                        style="color: var(--el-color-success); font-size: 18px"
+                      >
+                        <Check />
+                      </el-icon>
+                      <el-icon
+                        v-else-if="
+                          row.target_query === 0 || row.target_query === false
+                        "
+                        style="color: var(--el-color-danger); font-size: 18px"
+                      >
+                        <Close />
+                      </el-icon>
+                      <span v-else>{{ row.target_query }}</span>
+                    </div>
                   </template>
                   <template v-else-if="column.prop === 'is_valid_headline'">
                     <div class="cell-center">
@@ -245,7 +314,7 @@
                         row[column.prop],
                         column.prop,
                         start + index,
-                        row
+                        row,
                       )
                     }}
                   </template>
@@ -475,7 +544,7 @@ function calcInitialPageSize() {
         : Math.max(
             270,
             (typeof window !== "undefined" ? window.innerHeight : 800) -
-              props.heightOffset
+              props.heightOffset,
           );
     const bodyH = Math.max(0, avail - hdr);
     let sz = Math.floor(bodyH / rowHeight);
@@ -634,7 +703,7 @@ function recalcPageSize() {
     const headerStr =
       (tableCardRef.value &&
         getComputedStyle(tableCardRef.value).getPropertyValue(
-          "--header-height"
+          "--header-height",
         )) ||
       `${rowHeight}px`;
     const headerPx = Number(String(headerStr).replace("px", "")) || rowHeight;
@@ -746,7 +815,7 @@ function assembleFromCache(startRowGlobal: number, count: number) {
               "index",
               i,
               "startRow",
-              startRowGlobal
+              startRowGlobal,
             );
           remaining = 0; // stop outer loop as well
           break;
@@ -817,7 +886,7 @@ const visiblePage = computed(() => {
                 .map((item: any, index: number) => ({
                   ...item,
                   _rowNumber: pageStartGlobal + startInPage + index + 1,
-                }))
+                })),
             );
           }
         }
@@ -958,7 +1027,7 @@ const visiblePage = computed(() => {
             "[prefetch] assembled from cache for startRow",
             startRow,
             "items",
-            assembled.items.length
+            assembled.items.length,
           );
         // If assembled items are fewer than wanted, prefer recent lastRenderedPage to avoid partial fill
         if (assembled.items.length < wantedCount) {
@@ -970,7 +1039,7 @@ const visiblePage = computed(() => {
           ) {
             if (debugPrefetch)
               console.debug(
-                "[prefetch] assembled partial; using lastRenderedPage to avoid partial fill"
+                "[prefetch] assembled partial; using lastRenderedPage to avoid partial fill",
               );
             return lastRenderedPage.value;
           }
@@ -1035,7 +1104,7 @@ const visiblePage = computed(() => {
               const missingLimit = wantedCount - assembled.items.length;
               const extra = await dexie.getKeywordsByProject(
                 String(projectAny.currentProjectId),
-                { offset: missingOffset, limit: missingLimit }
+                { offset: missingOffset, limit: missingLimit },
               );
               if (extra && Array.isArray(extra) && extra.length) {
                 // insert into pageCache appropriately
@@ -1048,7 +1117,7 @@ const visiblePage = computed(() => {
                   const startInPage = Math.max(0, cursor - pageStart);
                   const fill = Math.min(
                     extra.length - i,
-                    pageSize.value - startInPage
+                    pageSize.value - startInPage,
                   );
                   for (let j = 0; j < fill; j++) {
                     page[startInPage + j] = extra[i + j];
@@ -1061,7 +1130,7 @@ const visiblePage = computed(() => {
                   console.debug(
                     "[prefetch] background filled missing rows from dexie",
                     missingOffset,
-                    extra.length
+                    extra.length,
                   );
               }
             } catch (e) {
@@ -1197,7 +1266,7 @@ const visiblePage = computed(() => {
                 await dexie.init();
                 const page = await dexie.getKeywordsPage(
                   String(projectAny.currentProjectId),
-                  { limit: limit, after: after || undefined }
+                  { limit: limit, after: after || undefined },
                 );
                 if (page && Array.isArray(page.items)) {
                   pageCache.value.set(pageIdx, page.items);
@@ -1230,7 +1299,7 @@ const visiblePage = computed(() => {
       const availableStart = Math.max(0, startRow - windowStartRow);
       const availableEnd = Math.min(
         dataComp.value.length,
-        endRow - windowStartRow
+        endRow - windowStartRow,
       );
       if (
         availableStart < availableEnd &&
@@ -1242,7 +1311,7 @@ const visiblePage = computed(() => {
             .map((item, index) => ({
               ...item,
               _rowNumber: windowStartRow + availableStart + index + 1,
-            }))
+            })),
         );
       }
 
@@ -1276,13 +1345,13 @@ const visiblePage = computed(() => {
               "tailStart",
               tailStart,
               "tailCount",
-              tailCount
+              tailCount,
             );
           return renderAndCache(
             dataComp.value.slice(tailStart).map((item, index) => ({
               ...item,
               _rowNumber: windowStartRow + tailStart + index + 1,
-            }))
+            })),
           );
         }
       } catch (e) {}
@@ -1329,8 +1398,8 @@ const handleHeight = computed(() => {
     const calculatedHeight = Math.max(
       20,
       Math.floor(
-        ((scroller.value as HTMLElement).clientHeight - 10) * proportion
-      )
+        ((scroller.value as HTMLElement).clientHeight - 10) * proportion,
+      ),
     ); // Минимум 20px
 
     return `${calculatedHeight}px`;
@@ -1396,7 +1465,7 @@ watch(
   () => tableHeight.value,
   () => {
     recalcPageSize();
-  }
+  },
 );
 
 // Computed property для общей высоты таблицы (все строки)
@@ -1457,7 +1526,7 @@ function formatCellValue(
   value: any,
   columnProp: string,
   rowIndex: number | null = null,
-  row: any = null
+  row: any = null,
 ) {
   try {
     if (columnProp === "_rowNumber") {
@@ -1481,9 +1550,9 @@ function formatCellValue(
         // Use inline-flex wrapper so the tag can be right-aligned inside the cell.
         // Escape the category name to avoid accidental HTML injection.
         return `<span class="category-info-inline"><span class="category-name" title="${escapeHtml(
-          name
+          name,
         )}">${escapeHtml(
-          name
+          name,
         )}</span><span class="similarity-tag">${simFormatted}</span></span>`;
       } catch (e) {
         console.error("Error in category_info formatting:", e);
@@ -1502,6 +1571,19 @@ function formatCellValue(
         return date.format("YYYY-MM-DD HH:mm:ss");
       }
       return value; // Если не удалось распарсить, возвращаем как есть
+    }
+
+    // Обработка classification_label — пропускаем, так как у него есть кастомный шаблон
+    if (columnProp === "classification_label") {
+      return "";
+    }
+
+    // Обработка classification_score и cluster_score — пропускаем, так как у них есть кастомные шаблоны
+    if (
+      columnProp === "classification_score" ||
+      columnProp === "cluster_score"
+    ) {
+      return "";
     }
 
     // Display similarity fields as percent (0.0 - 1.0 => 0% - 100%) or numeric 0-100
@@ -1532,6 +1614,18 @@ function formatSimilarity(value: any) {
   if (Number.isNaN(num)) return "";
   const v = num <= 1 ? num * 100 : num;
   return `${v.toFixed(2)}%`;
+}
+
+function getConfidenceTagType(value: any) {
+  const raw = Number(value);
+  const num = raw <= 1 && raw >= 0 ? raw * 100 : raw;
+
+  if (Number.isNaN(num)) return "info";
+  if (num === 0) return "info";
+  if (num > 90) return "success";
+  if (num >= 70) return "primary";
+  if (num >= 50) return "warning";
+  return "danger";
 }
 
 // Sanitize column header names: remove accidental injected attribute-like text
@@ -1597,7 +1691,7 @@ function getSortClass(columnProp: string) {
       "derivedField=",
       field,
       "direction=",
-      direction
+      direction,
     );
 
     // Учитываем маппинг _id <-> id
@@ -1606,8 +1700,8 @@ function getSortClass(columnProp: string) {
       columnProp === "category_info"
         ? "category_similarity"
         : columnProp === "class_info"
-        ? "class_similarity"
-        : columnProp;
+          ? "class_similarity"
+          : columnProp;
     const isCurrentColumn =
       field === mappedColumnProp ||
       (field === "id" && mappedColumnProp === "_id") ||
@@ -1684,7 +1778,7 @@ function handleSort(columnProp: string) {
       "from column=",
       columnProp,
       "props.sort=",
-      props.sort
+      props.sort,
     );
 
     props.sortData(sortObj);
@@ -1797,7 +1891,7 @@ watch(
     if (!newVal) {
       // debug: loadingMore reset to false (removed console.log)
     }
-  }
+  },
 );
 
 // Watch props.data/windowStart to cache loaded pages and compute cursors for next pages
@@ -1830,7 +1924,7 @@ watch(
             "[prefetch] cached props.data for pageIdx",
             pageIdx,
             "len",
-            pData.length
+            pData.length,
           );
         // If we were waiting for data for a recently-updated windowStart,
         // now that data arrived, sync internal windowStart and refresh handle.
@@ -1852,7 +1946,7 @@ watch(
     } catch (e) {
       // ignore
     }
-  }
+  },
 );
 
 // Column resizing functions
@@ -1926,7 +2020,7 @@ function stopResize() {
     // Then save the final width to the project store
     saveColumnWidth(
       currentColumn.value,
-      columnWidths.value[currentColumn.value]
+      columnWidths.value[currentColumn.value],
     );
   }
 
@@ -2223,7 +2317,7 @@ function saveColumnWidth(columnProp, width) {
     projectAny.defaultColumns = [];
   }
   const defaultColumnIndex = projectAny.defaultColumns.findIndex(
-    (col) => col.prop === columnProp
+    (col) => col.prop === columnProp,
   );
   if (defaultColumnIndex !== -1) {
     projectAny.defaultColumns[defaultColumnIndex].width = finalWidth;
@@ -2231,7 +2325,7 @@ function saveColumnWidth(columnProp, width) {
     // Try to find in the parser columns (only if parser exists and is an array)
     if (projectAny.data && Array.isArray(projectAny.data.parser)) {
       const parserColumnIndex = projectAny.data.parser.findIndex(
-        (col) => col.prop === columnProp
+        (col) => col.prop === columnProp,
       );
       if (parserColumnIndex !== -1) {
         projectAny.data.parser[parserColumnIndex].width = finalWidth;
@@ -2300,7 +2394,7 @@ function loadColumnWidthsFromLocalStorage() {
       if (processedWidths["_rowNumber"]) {
         processedWidths["_rowNumber"] = Math.max(
           35,
-          processedWidths["_rowNumber"]
+          processedWidths["_rowNumber"],
         );
       }
 
@@ -2332,7 +2426,7 @@ function loadColumnWidthsFromLocalStorage() {
 const syncHeaderAndBodyColumns = () => {
   const headerCols = document.querySelectorAll(".table-header-container th");
   const bodyCols = document.querySelectorAll(
-    ".table-body-container tr:first-child td"
+    ".table-body-container tr:first-child td",
   );
 
   if (headerCols.length === bodyCols.length) {
@@ -2402,7 +2496,7 @@ onMounted(async () => {
         if (projectWidths["_rowNumber"]) {
           projectWidths["_rowNumber"] = Math.max(
             35,
-            projectWidths["_rowNumber"]
+            projectWidths["_rowNumber"],
           );
         }
         columnWidths.value = { ...projectWidths };
@@ -2496,7 +2590,7 @@ onMounted(async () => {
           // Доступная высота под строки = высота окна минус отступы и высота заголовка
           const available = Math.max(
             0,
-            windowHeight.value - props.heightOffset - headerHeight
+            windowHeight.value - props.heightOffset - headerHeight,
           );
           const rows = Math.floor(available / rowHeight);
           const effectiveRows = Math.max(1, rows);
@@ -2515,7 +2609,7 @@ onMounted(async () => {
           // Рассчитываем новый максимально допустимый scrollTop и корректируем текущий.
           const newMaxScrollTop = Math.max(
             0,
-            totalTableHeight.value - pageSize.value * rowHeight
+            totalTableHeight.value - pageSize.value * rowHeight,
           );
           if (scrollTop.value > newMaxScrollTop) {
             scrollTop.value = newMaxScrollTop;
@@ -2525,7 +2619,7 @@ onMounted(async () => {
           const newStartFromScroll = Math.floor(scrollTop.value / rowHeight);
           start.value = Math.min(
             start.value,
-            Math.max(0, props.totalCount - pageSize.value)
+            Math.max(0, props.totalCount - pageSize.value),
           );
           // Также убеждаемся, что start синхронизирован с scrollTop
           if (start.value !== newStartFromScroll) {
@@ -2572,7 +2666,7 @@ onMounted(async () => {
         }
         updateHandlePosition();
       },
-      { deep: true }
+      { deep: true },
     );
 
     // Следим за изменениями pageSize и количества данных для обновления позиции ползунка
@@ -2602,7 +2696,7 @@ onMounted(async () => {
       () => start.value,
       (newStart, oldStart) => {
         // Track start changes for debugging
-      }
+      },
     );
 
     // Отслеживаем изменения в scrollTop для синхронизации с start
@@ -2613,7 +2707,7 @@ onMounted(async () => {
         if (newStart !== start.value) {
           start.value = newStart;
         }
-      }
+      },
     );
 
     // Следим за количеством данных и запрашиваем дополнительные, если их меньше 50
@@ -2622,7 +2716,7 @@ onMounted(async () => {
     watch(
       () => visiblePage.value,
       (newPage, oldPage) => {},
-      { deep: true }
+      { deep: true },
     );
 
     // Запускаем синхронизацию сразу после монтирования
@@ -2678,7 +2772,7 @@ watch(
     if (newProjectId) {
       props.loadData(newProjectId);
     }
-  }
+  },
 );
 
 // Sync internal windowStart with prop from parent store so component
@@ -2705,7 +2799,7 @@ watch(
         }
       }
     } catch (e) {}
-  }
+  },
 );
 
 // Add logging for debugging scrollTop, windowStart, and newWindowStart
@@ -2713,7 +2807,7 @@ watch(
   [scrollTop, () => windowStart.value],
   ([newScrollTop, newWindowStart]) => {
     // debug: scrollTop/windowStart change (console.log removed)
-  }
+  },
 );
 
 // Virtual scroll methods
@@ -2735,7 +2829,7 @@ function mousewheel(e) {
   // Ограничиваем scrollTop в допустимых пределах
   const maxScrollTop = Math.max(
     0,
-    totalTableHeight.value - pageSize.value * rowHeight
+    totalTableHeight.value - pageSize.value * rowHeight,
   );
 
   if (scrollTop.value < 0) scrollTop.value = 0;
@@ -2843,7 +2937,7 @@ function handleMouseMove(e) {
   // Рассчитываем scrollTop на основе позиции ползунка
   const maxScrollTop = Math.max(
     0,
-    totalTableHeight.value - pageSize.value * rowHeight
+    totalTableHeight.value - pageSize.value * rowHeight,
   );
   const availableHeight = Math.max(1, scrollerHeight - handleHeightPx); // Избегаем деления на 0
 
@@ -2876,7 +2970,7 @@ function updateHandlePosition() {
   const scrollerHeight = scroller.value.clientHeight - 10; // Высота скроллера минус отступы
   const maxScrollTop = Math.max(
     0,
-    totalTableHeight.value - pageSize.value * rowHeight
+    totalTableHeight.value - pageSize.value * rowHeight,
   );
 
   if (maxScrollTop === 0) {
@@ -2893,7 +2987,7 @@ function updateHandlePosition() {
     const handleHeightPx = parseInt(handleHeight.value);
     const availableHeight = scrollerHeight - handleHeightPx;
     htop.value = Math.floor(
-      (availableHeight / maxScrollTop) * scrollTop.value + 0.5
+      (availableHeight / maxScrollTop) * scrollTop.value + 0.5,
     );
   }
 }
@@ -3088,7 +3182,9 @@ html.dark .table-container {
     rgba(0, 123, 255, 0.008)
   );
   box-shadow: inset 0 0 0 2px rgba(0, 123, 255, 0.06);
-  transition: background-color 120ms ease, box-shadow 120ms ease;
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .sortable-header[draggable="true"] {
@@ -3116,7 +3212,9 @@ th[draggable="true"]:active .header-content {
   opacity: 0.95;
   z-index: 220;
   border-radius: 2px;
-  transition: opacity 120ms ease, transform 120ms ease;
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
 }
 .insert-left {
   left: 0px;

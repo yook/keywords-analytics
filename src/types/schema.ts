@@ -12,6 +12,10 @@ export type Keyword = {
   category_similarity?: number;
   class_name?: string;
   class_similarity?: number;
+  classification_label?: string;
+  classification_score?: number;
+  cluster_label?: string;
+  cluster_score?: number;
   target_query?: number | boolean;
   is_valid_headline?: number | boolean;
 };

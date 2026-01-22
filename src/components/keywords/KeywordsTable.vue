@@ -119,8 +119,14 @@ const allColumns = [
   { prop: "blocking_rule", name: "Правило исключения", width: 240 },
   { prop: "created_at", name: t("table.date"), width: 180 },
   { prop: "category_info", name: "Категория", width: 240 },
-  { prop: "class_info", name: "Класс", width: 240 },
+  { prop: "classification_label", name: "Классификация (ML)", width: 180 },
+  {
+    prop: "classification_score",
+    name: "Уверенность классификации",
+    width: 160,
+  },
   { prop: "cluster_label", name: "Кластер", width: 150 },
+  { prop: "cluster_score", name: "Уверенность кластера", width: 160 },
   { prop: "lemma", name: "Лемма", width: 200 },
   { prop: "tags", name: "Теги", width: 200 },
   { prop: "is_valid_headline", name: "Проверка согласованности", width: 140 },
@@ -131,7 +137,14 @@ const allColumns = [
 // Ключи всех доступных колонок
 const allColumnKeys = allColumns.map((c) => c.prop);
 // По умолчанию включаем только эти колонки
-const defaultColumnKeys = ["keyword", "created_at", "lemma", "tags"];
+const defaultColumnKeys = [
+  "keyword",
+  "created_at",
+  "lemma",
+  "tags",
+  "classification_label",
+  "classification_score",
+];
 const props = defineProps({
   activeColumns: {
     type: Array,
@@ -174,7 +187,7 @@ watch(
       applyColumns(newVal);
     }
   },
-  { deep: true }
+  { deep: true },
 );
 
 const getStorageKey = () => {
@@ -220,7 +233,7 @@ function hydrateColumns() {
     const scope = columnsStorageKey.value || "keywords";
     if (scope === "keywords" || scope === "keywords-main") {
       const legacyGlobal = localStorage.getItem(
-        `keywords-table-columns-${project.currentProjectId || "anon"}`
+        `keywords-table-columns-${project.currentProjectId || "anon"}`,
       );
       if (legacyGlobal) {
         const arr = JSON.parse(legacyGlobal);
@@ -271,7 +284,7 @@ watch(
       // ignore
     }
   },
-  { deep: false }
+  { deep: false },
 );
 
 // При смене проекта поднимаем порядок колонок из БД/хранилища проекта
@@ -279,7 +292,7 @@ watch(
   () => project.currentProjectId,
   () => {
     hydrateColumns();
-  }
+  },
 );
 
 // Когда из БД приезжают настройки колонок нового проекта (project.data.columns),
@@ -292,7 +305,7 @@ watch(
   () => {
     hydrateColumns();
   },
-  { deep: false }
+  { deep: false },
 );
 
 // Transfer data ordered to match currentTableColumns (so settings dialog shows same order)
@@ -320,7 +333,7 @@ const transferColumns = computed(() => {
 const tableColumns = computed(() =>
   currentTableColumns.value
     .map((prop) => allColumns.find((c) => c.prop === prop))
-    .filter(Boolean)
+    .filter(Boolean),
 );
 
 // Данные для передачи в таблицу
@@ -348,7 +361,7 @@ const handleDeleteRow = (row) => {
       type: "error",
       icon: markRaw(Delete),
       customClass: "delete-msgbox-class",
-    }
+    },
   )
     .then(() => {
       console.log("Delete keyword:", row.id);
@@ -391,7 +404,7 @@ function onColumnsReorder(newOrder) {
       saveColumnOrder(
         project,
         columnsStorageKey.value,
-        currentTableColumns.value
+        currentTableColumns.value,
       );
     } catch (e) {
       console.error("saveColumnOrder failed", e);
@@ -410,7 +423,7 @@ watch(
       // Очищаем поиск при переключении проекта
       input3.value = "";
     }
-  }
+  },
 );
 
 // Debounce search
@@ -441,7 +454,7 @@ watch(
         });
       }
     }, 2000);
-  }
+  },
 );
 
 // Синхронизируем input с searchQuery из store
@@ -451,7 +464,7 @@ watch(
     if (newSearchQuery !== input3.value) {
       input3.value = newSearchQuery;
     }
-  }
+  },
 );
 
 // Убираем фокус после обновления данных поиска
@@ -466,7 +479,7 @@ watch(
         }
       });
     }
-  }
+  },
 );
 
 // Обработчик поиска при нажатии Enter

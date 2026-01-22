@@ -56,12 +56,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { Delete } from "@element-plus/icons-vue";
 import { ElMessageBox, ElMessage } from "element-plus";
 import { useI18n } from "vue-i18n";
 import { useProjectStore } from "../../stores/project";
-import { socket } from "../../stores/socket-client";
+import { socket } from "../../stores/event-bus";
 
 const { t } = useI18n();
 const project = useProjectStore();
@@ -70,19 +70,28 @@ const project = useProjectStore();
 const localProjectName = ref("");
 
 const updateLocalNameFromStore = () => {
+  if (!project.projectsList || project.projectsList.length === 0) return;
   const cur = project.projectsList.find(
-    (p) => String(p.value) === String(project.currentProjectId)
+    (p) => String(p.value) === String(project.currentProjectId),
   );
-  localProjectName.value = cur ? cur.label : "";
+  if (cur) {
+    localProjectName.value = cur.label;
+  }
 };
 
-onMounted(() => {
-  updateLocalNameFromStore();
-});
+// Update when project or list changes
+watch(
+  [() => project.currentProjectId, () => project.projectsList],
+  () => {
+    updateLocalNameFromStore();
+  },
+  { deep: true },
+);
 
-// Watch for project changes
-onMounted(() => {
-  project.getProjects();
+onMounted(async () => {
+  if (!project.projectsLoaded) {
+    await project.getProjects();
+  }
   updateLocalNameFromStore();
 });
 
@@ -93,7 +102,7 @@ onUnmounted(() => {
 const saveData = async () => {
   // Update in-memory label
   const idx = project.projectsList.findIndex(
-    (p) => String(p.value) === String(project.currentProjectId)
+    (p) => String(p.value) === String(project.currentProjectId),
   );
   if (idx !== -1) {
     project.projectsList[idx].label = localProjectName.value;
@@ -118,7 +127,7 @@ const deleteProjectConfirm = () => {
       type: "error",
       icon: Delete,
       customClass: "delete-msgbox-class",
-    }
+    },
   )
     .then(async () => {
       const id = project.currentProjectId;

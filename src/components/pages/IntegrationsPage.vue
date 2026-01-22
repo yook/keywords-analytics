@@ -27,15 +27,32 @@
                 <el-form label-width="150px">
                   <el-form-item label="OpenAI API key">
                     <el-input
-                      :disabled="!!maskedInput.value"
+                      v-if="!maskedInput.value"
                       v-model="form.openaiKey"
                       placeholder="sk-p..."
+                    />
+                    <el-input
+                      v-else
+                      :value="maskedInput.value"
+                      readonly
+                      disabled
                     />
                   </el-form-item>
                   <!-- Put masked key into the input value instead of showing separate label -->
                   <el-form-item>
-                    <el-button type="primary" @click="save('openai')">
-                      Сохранить
+                    <el-button
+                      type="primary"
+                      @click="save('openai')"
+                      :loading="isSaving"
+                      :icon="saveSuccess ? SuccessFilled : undefined"
+                    >
+                      {{
+                        saveSuccess
+                          ? "Сохранено ✓"
+                          : isSaving
+                            ? "Сохранение..."
+                            : "Сохранить"
+                      }}
                     </el-button>
                     <el-button
                       v-if="hasOpenaiKey.value"
@@ -72,13 +89,13 @@
 </template>
 
 <script setup>
-import { reactive, onMounted, watch, onUnmounted, markRaw } from "vue";
-import { socket } from "../../stores/socket-client";
+import { reactive, onMounted, watch, onUnmounted, markRaw, ref } from "vue";
+import { socket } from "../../stores/event-bus";
 import { useProjectStore } from "../../stores/project";
 import { useI18n } from "vue-i18n";
 import { ElMessageBox, ElMessage } from "element-plus";
-import { Delete } from "@element-plus/icons-vue";
-// no additional vue refs needed
+import { Delete, SuccessFilled } from "@element-plus/icons-vue";
+import { useDexie } from "../../composables/useDexie";
 
 const project = useProjectStore();
 const form = reactive({ openaiKey: "" });
@@ -86,8 +103,20 @@ const hasOpenaiKey = reactive({ value: false });
 const masked = reactive({ key: null, updated_at: null });
 const maskedInput = reactive({ value: "" });
 const cacheSize = reactive({ value: 0 });
+const isSaving = ref(false);
+const saveSuccess = ref(false);
 
 const { t } = useI18n();
+
+async function updateCacheSize() {
+  try {
+    const db = useDexie();
+    const size = await db.embeddingsCacheGetSize();
+    cacheSize.value = size;
+  } catch (e) {
+    console.warn("Failed to get cache size:", e);
+  }
+}
 
 onMounted(() => {
   const pid = project.currentProjectId;
@@ -95,8 +124,8 @@ onMounted(() => {
     socket.emit("integrations:get", { projectId: pid, service: "openai" });
   // no proxy settings requested from main process (proxy UI removed)
 
-  // Get cache size
-  socket.emit("get-embeddings-cache-size");
+  // Get cache size from database
+  updateCacheSize();
 
   // no master-key management UI anymore
 
@@ -106,7 +135,7 @@ onMounted(() => {
     (val) => {
       if (val)
         socket.emit("integrations:get", { projectId: val, service: "openai" });
-    }
+    },
   );
   // ensure we stop the watcher on unmount
   onUnmounted(() => stop());
@@ -141,11 +170,16 @@ socket.on("integrations:info", (data) => {
 socket.on("integrations:setKey:ok", (data) => {
   if (!data) return;
   if (String(data.projectId) !== String(project.currentProjectId)) return;
-  window.$message?.success("OpenAI key saved");
-  // Clear input for security
-  form.openaiKey = "";
+  isSaving.value = false;
+  saveSuccess.value = true;
+  ElMessage.success("OpenAI ключ успешно сохранен");
 
-  // Refresh info
+  // Reset success indicator after 3 seconds
+  setTimeout(() => {
+    saveSuccess.value = false;
+  }, 3000);
+
+  // Refresh info to get masked key
   socket.emit("integrations:get", {
     projectId: data.projectId,
     service: "openai",
@@ -168,17 +202,24 @@ socket.on("integrations:deleted", (data) => {
 });
 
 socket.on("embeddings-cache-size", (data) => {
+  // Legacy handler - can be removed once socket events are phased out
   cacheSize.value = data.size || 0;
 });
 
 socket.on("embeddings-cache-cleared", () => {
-  cacheSize.value = 0;
-  ElMessage.success("Кэш эмбеддингов очищен");
+  // Legacy handler - can be removed once socket events are phased out
+  updateCacheSize();
 });
 
-// cleanup socket listeners on unmount
+// Update cache size periodically
+const cacheUpdateInterval = setInterval(() => {
+  updateCacheSize();
+}, 5000);
+
+// cleanup socket listeners and interval on unmount
 onUnmounted(() => {
   try {
+    clearInterval(cacheUpdateInterval);
     socket.off("integrations:info");
     socket.off("integrations:setKey:ok");
     socket.off("integrations:deleted");
@@ -191,7 +232,7 @@ async function save(kind) {
   if (kind === "openai") {
     const pid = project.currentProjectId;
     if (!pid) {
-      window.$message?.error("Проект не выбран");
+      ElMessage.error("Проект не выбран");
       return;
     }
     // If the input equals the masked placeholder and a key already exists, do nothing
@@ -200,9 +241,15 @@ async function save(kind) {
       maskedInput.value &&
       form.openaiKey === maskedInput.value
     ) {
-      window.$message?.info("Ключ не изменён");
+      ElMessage.info("Ключ не изменён");
       return;
     }
+    if (!form.openaiKey || form.openaiKey.trim() === "") {
+      ElMessage.warning("Введите OpenAI API ключ");
+      return;
+    }
+    isSaving.value = true;
+    saveSuccess.value = false;
     socket.emit("integrations:setKey", {
       projectId: pid,
       service: "openai",
@@ -225,7 +272,7 @@ function confirmDelete() {
       type: "error",
       icon: markRaw(Delete),
       customClass: "delete-msgbox-class",
-    }
+    },
   )
     .then(() => {
       const pid = project.currentProjectId;
@@ -237,7 +284,16 @@ function confirmDelete() {
 }
 
 function clearCache() {
-  project.clearEmbeddingsCache();
+  project
+    .clearEmbeddingsCache()
+    .then(() => {
+      ElMessage.success("Кэш эмбеддингов очищен");
+      updateCacheSize();
+    })
+    .catch((e) => {
+      console.error("Failed to clear cache:", e);
+      ElMessage.error("Ошибка при очистке кэша");
+    });
 }
 
 // editing via focus removed; input is readonly when key exists

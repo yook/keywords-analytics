@@ -17,6 +17,8 @@ type KeywordRow = {
   morphology_processed?: number
   target_query?: number | boolean
   blocking_rule?: string
+  classification_label?: string
+  classification_score?: number
 }
 
 type SortDirection = 'ascending' | 'descending'
@@ -129,6 +131,16 @@ export const useKeywordsStore = defineStore('keywords', {
     currentProcessLabel: '' as string | null,
     currentTotal: 0,
     currentProcessed: 0,
+    
+    // Detailed progress object for complex operations (e.g., clustering)
+    progress: null as {
+      stage: string;
+      fetched?: number;
+      total?: number;
+      percent?: number;
+      processed?: number;
+      source?: string;
+    } | null,
   }),
   actions: {
     async addKeywords(raw: string) {
@@ -489,6 +501,37 @@ export const useKeywordsStore = defineStore('keywords', {
       const WINDOW_SIZE = 300;
       if (projectId) {
         await this.loadKeywords(String(projectId), { offset: newStart, limit: WINDOW_SIZE, background: true })
+      }
+    },
+    
+    async getKeywordsByProject(projectId: string): Promise<KeywordRow[]> {
+      try {
+        const dexie = useDexie()
+        const keywords = await dexie.getKeywordsByProject(String(projectId), { offset: 0, limit: 999999 })
+        return (keywords || []).map((r: any) => ({ ...(r || {}), id: String(r.id) })) as KeywordRow[]
+      } catch (e) {
+        console.warn('getKeywordsByProject failed:', e)
+        return []
+      }
+    },
+
+    async bulkUpdateKeywords(keywords: KeywordRow[]) {
+      try {
+        const dexie = useDexie()
+        // Update each keyword with classification results
+        for (const kw of keywords) {
+          if (kw.id) {
+            await dexie.updateKeyword(kw)
+          }
+        }
+        
+        // Reload keywords to reflect changes in UI
+        const project = useProjectStore()
+        if (project.currentProjectId) {
+          await this.loadKeywords(String(project.currentProjectId), { offset: 0, limit: 300 })
+        }
+      } catch (e) {
+        console.warn('bulkUpdateKeywords failed:', e)
       }
     },
   },

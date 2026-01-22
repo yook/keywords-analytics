@@ -10,6 +10,16 @@ type Keyword = {
   lemma?: string;
   tags?: string;
   morphology_processed?: number;
+  category_name?: string;
+  category_similarity?: number;
+  class_name?: string;
+  class_similarity?: number;
+  classification_label?: string;
+  classification_score?: number;
+  cluster_label?: string;
+  cluster_score?: number;
+  target_query?: number | boolean;
+  is_valid_headline?: number | boolean;
 }
 
 type StopWord = {
@@ -19,11 +29,42 @@ type StopWord = {
   created_at?: string;
 }
 
+type TypingSample = {
+  id?: string;
+  projectId?: number | string;
+  label: string;
+  text: string;
+  created_at?: string;
+}
+
+type EmbeddingsCacheEntry = {
+  id?: string;
+  key: string;
+  embedding: ArrayBuffer;
+  vector_model: string;
+  created_at?: string;
+}
+
+type ClassificationModel = {
+  id?: string;
+  projectId: number | string;
+  W: ArrayBuffer; // stored as ArrayBuffer for efficiency
+  b: ArrayBuffer;
+  labels: string[];
+  D: number;
+  model_version: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 class AppDB extends Dexie {
   projects!: Dexie.Table<Project, string>
   greetings!: Dexie.Table<{ id: number; text: string }, number>
   keywords!: Dexie.Table<Keyword, string>
   stopwords!: Dexie.Table<StopWord, string>
+  typing_samples!: Dexie.Table<TypingSample, string>
+  embeddings_cache!: Dexie.Table<EmbeddingsCacheEntry, string>
+  classification_models!: Dexie.Table<ClassificationModel, string>
 
   constructor() {
     super('app-db')
@@ -40,6 +81,18 @@ class AppDB extends Dexie {
     // add stopwords in version 3
     this.version(3).stores({
       stopwords: '&id,projectId,word,created_at,[projectId+word]',
+    })
+    // add typing_samples in version 4 for classification/typing training data persistence
+    this.version(4).stores({
+      typing_samples: '&id,projectId,label,created_at,[projectId+label]',
+    })
+    // add embeddings_cache in version 5 for storing OpenAI embeddings
+    this.version(5).stores({
+      embeddings_cache: '&id,key,vector_model,created_at,[key+vector_model]',
+    })
+    // add classification_models in version 6 for storing trained models per project
+    this.version(6).stores({
+      classification_models: '&id,projectId,created_at,updated_at',
     })
   }
 }
@@ -144,6 +197,14 @@ export function useDexie() {
     // ensure deterministic id when projectId+keyword provided
     if ((!item.id || item.id === '') && item.projectId && item.keyword) {
       item.id = `${item.projectId}::${encodeURIComponent(item.keyword.trim().toLowerCase())}`
+    }
+    return await db.keywords.put(item)
+  }
+
+  async function updateKeyword(item: Keyword) {
+    const db = await init()
+    if (!item.id) {
+      throw new Error('Cannot update keyword without id')
     }
     return await db.keywords.put(item)
   }
@@ -447,6 +508,208 @@ export function useDexie() {
     }
   }
 
+  // typing samples API for classification training data persistence
+  async function getTypingSamplesByProject(projectId: number | string): Promise<TypingSample[]> {
+    const db = await init()
+    try {
+      return await db.typing_samples.where('projectId').equals(String(projectId)).toArray()
+    } catch (e) {
+      // fallback
+      const all = await db.typing_samples.toArray()
+      return all.filter(s => String(s.projectId) === String(projectId))
+    }
+  }
+
+  async function addTypingSample(item: TypingSample) {
+    const db = await init()
+    if (!item.id) {
+      item.id = `${item.projectId}::${item.label}::${encodeURIComponent(item.text.trim().toLowerCase())}`
+    }
+    if (!item.created_at) {
+      item.created_at = new Date().toISOString()
+    }
+    return await db.typing_samples.put(item)
+  }
+
+  async function deleteTypingSample(id: string) {
+    const db = await init()
+    return await db.typing_samples.delete(id)
+  }
+
+  async function deleteTypingSamplesByLabel(projectId: number | string, label: string) {
+    const db = await init()
+    try {
+      const all = await db.typing_samples.where('projectId').equals(String(projectId)).toArray()
+      const ids = all.filter(s => s.label === label).map(s => s.id).filter((id): id is string => !!id)
+      if (ids.length > 0) {
+        await db.typing_samples.bulkDelete(ids)
+      }
+    } catch (e) {
+      // fallback: manual deletion
+      const all = await db.typing_samples.toArray()
+      const ids = all.filter(s => String(s.projectId) === String(projectId) && s.label === label).map(s => s.id).filter((id): id is string => !!id)
+      for (const id of ids) {
+        try {
+          await db.typing_samples.delete(id)
+        } catch (e2) {}
+      }
+    }
+  }
+
+  async function clearTypingSamplesByProject(projectId: number | string) {
+    const db = await init()
+    try {
+      await db.typing_samples.where('projectId').equals(String(projectId)).delete()
+    } catch (e) {
+      // fallback
+      const all = await db.typing_samples.toArray()
+      const ids = all.filter(s => String(s.projectId) === String(projectId)).map(s => s.id).filter((id): id is string => !!id)
+      if (ids.length > 0) {
+        await db.typing_samples.bulkDelete(ids)
+      }
+    }
+  }
+
+  // Embeddings cache functions
+  async function embeddingsCachePut(key: string, embedding: number[], vector_model: string = 'text-embedding-3-small') {
+    const db = await init()
+    const id = `${vector_model}:${key}`
+    // Convert Float32Array to ArrayBuffer
+    const buffer = new Float32Array(embedding).buffer
+    await db.embeddings_cache.put({
+      id,
+      key,
+      embedding: buffer,
+      vector_model,
+      created_at: new Date().toISOString(),
+    })
+  }
+
+  async function embeddingsCacheGet(key: string, vector_model: string = 'text-embedding-3-small'): Promise<number[] | null> {
+    const db = await init()
+    const id = `${vector_model}:${key}`
+    const entry = await db.embeddings_cache.get(id)
+    if (!entry) return null
+    // Convert ArrayBuffer back to Float32Array
+    return Array.from(new Float32Array(entry.embedding))
+  }
+
+  async function embeddingsCacheGetBulk(keys: string[], vector_model: string = 'text-embedding-3-small'): Promise<(number[] | null)[]> {
+    const db = await init()
+    const results: (number[] | null)[] = []
+    
+    for (const key of keys) {
+      const id = `${vector_model}:${key}`
+      const entry = await db.embeddings_cache.get(id)
+      if (entry) {
+        results.push(Array.from(new Float32Array(entry.embedding)))
+      } else {
+        results.push(null)
+      }
+    }
+    
+    return results
+  }
+
+  async function embeddingsCacheBulkPut(items: Array<{ key: string; embedding: number[] }>, vector_model: string = 'text-embedding-3-small') {
+    const db = await init()
+    const entries: EmbeddingsCacheEntry[] = items.map(item => ({
+      id: `${vector_model}:${item.key}`,
+      key: item.key,
+      embedding: new Float32Array(item.embedding).buffer,
+      vector_model,
+      created_at: new Date().toISOString(),
+    }))
+    
+    await db.embeddings_cache.bulkPut(entries)
+  }
+
+  async function embeddingsCacheClear() {
+    const db = await init()
+    await db.embeddings_cache.clear()
+  }
+
+  async function embeddingsCacheClearByModel(vector_model: string) {
+    const db = await init()
+    await db.embeddings_cache.where('vector_model').equals(vector_model).delete()
+  }
+
+  async function embeddingsCacheGetSize(): Promise<number> {
+    const db = await init()
+    return await db.embeddings_cache.count()
+  }
+
+  // Classification Models API
+  async function saveClassificationModel(
+    projectId: number | string,
+    model: {
+      W: number[][];
+      b: number[];
+      labels: string[];
+      D: number;
+      model_version: string;
+    }
+  ) {
+    const db = await init()
+    const id = `model_${projectId}`
+    
+    // Convert arrays to ArrayBuffer for efficient storage
+    const WBuffer = new Float32Array(model.W.flat()).buffer
+    const bBuffer = new Float32Array(model.b).buffer
+    
+    const entry: ClassificationModel = {
+      id,
+      projectId,
+      W: WBuffer,
+      b: bBuffer,
+      labels: model.labels,
+      D: model.D,
+      model_version: model.model_version,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+    
+    await db.classification_models.put(entry)
+  }
+
+  async function getClassificationModel(projectId: number | string): Promise<{
+    W: number[][];
+    b: number[];
+    labels: string[];
+    D: number;
+    model_version: string;
+  } | null> {
+    const db = await init()
+    const id = `model_${projectId}`
+    const entry = await db.classification_models.get(id)
+    
+    if (!entry) return null
+    
+    // Convert ArrayBuffer back to arrays
+    const WFlat = Array.from(new Float32Array(entry.W))
+    const W: number[][] = []
+    const cols = entry.D
+    for (let i = 0; i < WFlat.length; i += cols) {
+      W.push(WFlat.slice(i, i + cols))
+    }
+    
+    const b = Array.from(new Float32Array(entry.b))
+    
+    return {
+      W,
+      b,
+      labels: entry.labels,
+      D: entry.D,
+      model_version: entry.model_version,
+    }
+  }
+
+  async function deleteClassificationModel(projectId: number | string) {
+    const db = await init()
+    const id = `model_${projectId}`
+    await db.classification_models.delete(id)
+  }
+
   const api = {
     init,
     getProjects,
@@ -459,6 +722,7 @@ export function useDexie() {
     getKeywords,
     getKeywordsPage,
     addKeyword,
+    updateKeyword,
     bulkPutKeywords,
     clearKeywords,
     getKeywordsByProject,
@@ -472,6 +736,24 @@ export function useDexie() {
     addStopword,
     deleteStopword,
     clearStopwordsByProject,
+    // typing samples API
+    getTypingSamplesByProject,
+    addTypingSample,
+    deleteTypingSample,
+    deleteTypingSamplesByLabel,
+    clearTypingSamplesByProject,
+    // embeddings cache API
+    embeddingsCachePut,
+    embeddingsCacheGet,
+    embeddingsCacheGetBulk,
+    embeddingsCacheBulkPut,
+    embeddingsCacheClear,
+    embeddingsCacheClearByModel,
+    embeddingsCacheGetSize,
+    // classification models API
+    saveClassificationModel,
+    getClassificationModel,
+    deleteClassificationModel,
     dbRef,
   }
   try { ;(window as any).__dexie = api } catch (e) {}
