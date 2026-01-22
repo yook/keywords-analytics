@@ -3,6 +3,18 @@ import { useDexie } from '../composables/useDexie'
 
 type ProjectItem = { value: string; label: string; url?: string; data?: any }
 
+// Helper to ensure data is JSON-serializable for IndexedDB
+function serializeProjectData(data: any): any {
+  if (!data) return {}
+  try {
+    // Try to serialize and deserialize to ensure it's cloneable
+    return JSON.parse(JSON.stringify(data))
+  } catch (e) {
+    console.warn('Failed to serialize project data:', e)
+    return {}
+  }
+}
+
 export const useProjectStore = defineStore('project', {
   state: () => ({
     projectsList: [] as ProjectItem[],
@@ -66,7 +78,7 @@ export const useProjectStore = defineStore('project', {
         if (this.currentProjectId) {
           const idx = this.projectsList.findIndex(p => String(p.value) === String(this.currentProjectId))
           if (idx !== -1) {
-            this.projectsList[idx].data = { ...this.data }
+            this.projectsList[idx].data = serializeProjectData(this.data)
           }
         }
 
@@ -74,7 +86,7 @@ export const useProjectStore = defineStore('project', {
           id: String(p.value), 
           name: String(p.label), 
           url: String(p.url || ''),
-          data: p.data || {}
+          data: serializeProjectData(p.data)
         }))
         
         console.log('[ProjectStore] saving projects to DB:', normalized)
@@ -92,7 +104,7 @@ export const useProjectStore = defineStore('project', {
       try {
         const db = useDexie()
         await db.init()
-        await db.addOrUpdateProject({ id, name: payload.name || '', url: payload.url || '' })
+        await db.addOrUpdateProject({ id, name: payload.name || '', url: payload.url || '', data: {} })
         try { await db.persistToIndexedDB() } catch (e) { console.warn('persist failed', e) }
       } catch (e) {
         console.warn('saveNewProject DB write failed', e)
@@ -112,7 +124,7 @@ export const useProjectStore = defineStore('project', {
       try {
         const db = useDexie()
         await db.init()
-        await db.addOrUpdateProject({ id, name: label, url: '' })
+        await db.addOrUpdateProject({ id, name: label, url: '', data: {} })
         try { await db.persistToIndexedDB() } catch (e) { console.warn('persist failed', e) }
       } catch (e) {
         console.warn('addProject DB write failed', e)
@@ -196,7 +208,7 @@ export const useProjectStore = defineStore('project', {
           id: String(payload.id),
           name: payload.name,
           url: existing ? (existing.url || '') : '',
-          data: existing ? (existing.data || {}) : {}
+          data: existing ? serializeProjectData(existing.data) : {}
         }
         
         await db.addOrUpdateProject(updated)
@@ -230,7 +242,7 @@ export const useProjectStore = defineStore('project', {
           id: String(id),
           name: existing.name,
           url: existing.url || '',
-          data: { ...this.data }
+          data: serializeProjectData(this.data)
         }
         
         await db.addOrUpdateProject(updated)
@@ -239,7 +251,7 @@ export const useProjectStore = defineStore('project', {
         // Update in-memory
         const idx = this.projectsList.findIndex(p => String(p.value) === String(id))
         if (idx !== -1) {
-          this.projectsList[idx].data = { ...this.data }
+          this.projectsList[idx].data = serializeProjectData(this.data)
         }
       } catch (e) {
         console.warn('saveProjectData failed', e)
