@@ -49,7 +49,8 @@ export default defineConfig({
           },
         ],
         additionalManifestEntries: [
-          { url: '/assets/lemmas.json.gz', revision: null },
+          // Must be relative for GitHub Pages (served under /<repo>/)
+          { url: 'assets/lemmas.json.gz', revision: null },
         ],
       }
     })
