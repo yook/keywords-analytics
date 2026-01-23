@@ -158,11 +158,27 @@ export const useProjectStore = defineStore('project', {
 
     async getOpenaiApiKey() {
       if (this.openaiApiKey) return this.openaiApiKey;
-      const key = localStorage.getItem('openaiKey_global');
-      if (key) {
-        this.openaiApiKey = key;
-        return key;
+      const stored = localStorage.getItem('openaiKey_global');
+      if (!stored) return '';
+
+      // If already plaintext, use as-is
+      if (stored.startsWith('sk-')) {
+        this.openaiApiKey = stored;
+        return stored;
       }
+
+      // Otherwise try to decrypt (encrypted at rest)
+      try {
+        const { decryptValue } = await import('../utils/encryption');
+        const decrypted = await decryptValue(stored);
+        if (decrypted) {
+          this.openaiApiKey = decrypted;
+          return decrypted;
+        }
+      } catch (e) {
+        console.warn('Failed to decrypt OpenAI key', e);
+      }
+
       return '';
     },
 

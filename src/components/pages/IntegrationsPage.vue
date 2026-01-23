@@ -186,6 +186,14 @@ socket.on("integrations:setKey:ok", (data) => {
   });
 });
 
+socket.on("integrations:setKey:error", (data) => {
+  if (!data) return;
+  if (String(data.projectId) !== String(project.currentProjectId)) return;
+  isSaving.value = false;
+  saveSuccess.value = false;
+  ElMessage.error(data.message || "Некорректный ключ OpenAI");
+});
+
 socket.on("integrations:deleted", (data) => {
   try {
     if (!data) return;
@@ -222,6 +230,7 @@ onUnmounted(() => {
     clearInterval(cacheUpdateInterval);
     socket.off("integrations:info");
     socket.off("integrations:setKey:ok");
+    socket.off("integrations:setKey:error");
     socket.off("integrations:deleted");
     socket.off("embeddings-cache-size");
     socket.off("embeddings-cache-cleared");
@@ -244,8 +253,17 @@ async function save(kind) {
       ElMessage.info("Ключ не изменён");
       return;
     }
-    if (!form.openaiKey || form.openaiKey.trim() === "") {
+    const trimmedKey = String(form.openaiKey || "").trim();
+    if (!trimmedKey) {
       ElMessage.warning("Введите OpenAI API ключ");
+      return;
+    }
+    if (trimmedKey.includes("*")) {
+      ElMessage.warning("Вставьте полный OpenAI API ключ без маски");
+      return;
+    }
+    if (!trimmedKey.startsWith("sk-")) {
+      ElMessage.warning("Похоже, ключ введён некорректно");
       return;
     }
     isSaving.value = true;
@@ -253,7 +271,7 @@ async function save(kind) {
     socket.emit("integrations:setKey", {
       projectId: pid,
       service: "openai",
-      key: form.openaiKey,
+      key: trimmedKey,
     });
     return;
   }

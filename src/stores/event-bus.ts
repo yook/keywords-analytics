@@ -132,8 +132,18 @@ export const ipcClient = {
       } else if (event === "integrations:setKey") {
         const { projectId, service, key } = payload || {};
         if (service === "openai" && key) {
+          const trimmedKey = String(key).trim();
+          const looksMasked = trimmedKey.includes("*");
+          const looksLikeKey = trimmedKey.startsWith("sk-");
+          if (!looksLikeKey || looksMasked) {
+            emitEvent("integrations:setKey:error", {
+              projectId,
+              message: "Некорректный ключ: вставьте полный OpenAI API key",
+            });
+            return;
+          }
           // Encrypt and save OpenAI key (global)
-          encryptValue(key)
+          encryptValue(trimmedKey)
             .then((encrypted) => {
               localStorage.setItem('openaiKey_global', encrypted);
               emitEvent("integrations:setKey:ok", { projectId });

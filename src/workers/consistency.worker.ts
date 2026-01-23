@@ -169,6 +169,22 @@ async function waitForSharedLemmaDictReady() {
 
 let currentRequestId: string | null = null;
 
+function emitLemmaDictStatus(status: 'loading' | 'ready') {
+  try {
+    if (!currentRequestId) return;
+    const message = status === 'loading' ? 'Загружаю словарь…' : 'Словарь загружен';
+    const percent = status === 'loading' ? 0 : 100;
+    self.postMessage({
+      type: 'consistency:progress',
+      requestId: currentRequestId,
+      stage: 'lemma-dict',
+      status,
+      message,
+      percent,
+    });
+  } catch (e) {}
+}
+
 self.addEventListener('error', (event) => {
   try {
     self.console?.error(
@@ -839,7 +855,9 @@ self.addEventListener('message', async (event) => {
     if (type !== 'consistency') return;
     const projectId = payload?.projectId ? String(payload.projectId) : 'anon';
     const BATCH = payload?.batchSize ? Number(payload.batchSize) : 10;
+    emitLemmaDictStatus('loading');
     await waitForSharedLemmaDictReady();
+    emitLemmaDictStatus('ready');
     const db = await openIDB();
     if (!db.objectStoreNames.contains('keywords')) {
       self.postMessage({ type: 'consistency:done', requestId, processed: 0, total: 0 });

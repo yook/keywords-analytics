@@ -451,6 +451,15 @@ export const useKeywordsStore = defineStore('keywords', {
           this.currentProcessLabel = 'Проверка согласованности'
         }
         const onProgress = (msg: any) => {
+          if (msg && msg.stage === 'lemma-dict') {
+            if (typeof msg.message === 'string') {
+              this.currentProcessLabel = msg.message
+            }
+            if (typeof msg.percent === 'number') {
+              this.morphologyCheckPercent = Math.min(100, Math.max(0, Math.round(msg.percent)))
+            }
+            return
+          }
           enforceCheckLabel()
           if (typeof msg.processed === 'number') {
             this.currentProcessed = msg.processed
