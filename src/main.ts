@@ -7,6 +7,7 @@ import './styles/index.css'
 import { createI18n } from 'vue-i18n'
 import { useDexie } from './composables/useDexie'
 import messages from './locales'
+import { registerSW } from 'virtual:pwa-register'
 
 const i18n = createI18n({
   legacy: false,
@@ -30,6 +31,9 @@ const i18n = createI18n({
   app.use(ElementPlus)
   app.use(i18n)
   app.mount('#app')
+
+  // Required for installability (Chrome shows the install icon only when a SW is registered)
+  registerSW({ immediate: true })
 })()
 
 // Persist SQL.js DB on page unload to avoid data loss on refresh

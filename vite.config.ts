@@ -17,15 +17,21 @@ export default defineConfig({
     vue(),
     VitePWA({
       registerType: 'autoUpdate',
+      devOptions: {
+        enabled: true,
+        type: 'module',
+      },
       manifest: {
         name: 'Vue PWA DuckDB Hello',
         short_name: 'DuckDBHello',
-        start_url: '/',
+        start_url: '.',
+        scope: '.',
         display: 'standalone',
         background_color: '#ffffff',
+        theme_color: '#ffffff',
         icons: [
-          { src: '/pwa-192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/pwa-512.png', sizes: '512x512', type: 'image/png' }
+          { src: 'pwa-192.png', sizes: '192x192', type: 'image/png' },
+          { src: 'pwa-512.png', sizes: '512x512', type: 'image/png' },
         ]
       },
       workbox: {
