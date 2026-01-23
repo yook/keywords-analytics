@@ -119,7 +119,8 @@ async function storeRecord<T extends DictCacheRecord | ParsedDictRecord>(payload
 }
 
 async function loadRawDict() {
-  const url = `${import.meta.env.BASE_URL}assets/lemmas.bin`;
+  // Use relative path ../assets/lemmas.bin since this is loaded from a worker in /assets/
+  const url = '../assets/lemmas.bin';
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
