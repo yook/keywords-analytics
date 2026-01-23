@@ -22,8 +22,8 @@ export default defineConfig({
         type: 'module',
       },
       manifest: {
-        name: 'Vue PWA DuckDB Hello',
-        short_name: 'DuckDBHello',
+        name: 'Keywords Analytics',
+        short_name: 'Keywords',
         start_url: '.',
         scope: '.',
         display: 'standalone',
