@@ -365,10 +365,10 @@ const tableColumns = ref([
 ]);
 
 // Data loading helpers
-async function loadWindow(start) {
+async function loadWindow(start: number) {
   await stopwordsStore.loadWindow(start);
 }
-function sortData(newSort) {
+function sortData(newSort: unknown) {
   stopwordsStore.sortStopwords(newSort);
 }
 async function loadData() {
@@ -376,12 +376,12 @@ async function loadData() {
   await stopwordsStore.loadStopwords(currentProjectId.value);
 }
 
-const currentProjectId = ref(null);
+const currentProjectId = ref<string | null>(null);
 const KEYWORDS_REFRESH_LIMIT = 300;
 const PROGRESS_YIELD_INTERVAL = 50;
 
 // Handle column reorder: update local tableColumns and persist via util
-function onColumnsReorder(newOrder) {
+function onColumnsReorder(newOrder: string[]) {
   try {
     if (!Array.isArray(newOrder)) return;
     // Map props to existing ColumnDef objects when possible
@@ -413,11 +413,11 @@ function onColumnsReorder(newOrder) {
   }
 }
 
-function parseInputText(text) {
+function parseInputText(text: string) {
   return text
     .split(/\r?\n/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+    .map((s: string) => s.trim())
+    .filter((s: string) => s.length > 0);
 }
 
 type InputMode = "text" | "regex";
@@ -570,11 +570,11 @@ async function runStopwordsProcess() {
 
       if (keyword.id) {
         const currentTarget = keyword.target_query;
-        const currentRule = keyword.blocking_rule || "";
+        const currentRule = (keyword as any).blocking_rule || "";
         if (currentTarget !== targetValue || currentRule !== intendedRule) {
           try {
             await keywordsTable.put({
-              ...keyword,
+              ...(keyword as any),
               target_query: targetValue,
               blocking_rule: intendedRule,
             });
@@ -641,7 +641,7 @@ async function addStopWords() {
 
   try {
     // Normalize stop-words: lowercase plain words, wrap regex bodies and ensure i/u
-    const normalized = items.map((it) => {
+    const normalized = items.map((it: string) => {
       const trimmed = String(it).trim();
       const regexParts = extractRegexParts(trimmed, inputMode.value);
       if (regexParts) {
@@ -663,8 +663,9 @@ async function addStopWords() {
   }
 }
 
-async function removeRow(row) {
+async function removeRow(row: { id?: string | number; word?: string }) {
   try {
+    if (row.id === undefined || row.id === null) return;
     await ElMessageBox.confirm(
       `Удалить стоп-слово "${row.word}"?`,
       "Подтверждение удаления",
@@ -677,14 +678,14 @@ async function removeRow(row) {
       },
     );
 
-    await stopwordsStore.deleteStopword(row.id);
+    await stopwordsStore.deleteStopword(String(row.id));
 
     // Перезагружаем данные keywords, чтобы обновились колонки "Целевой запрос" и "Правило исключения"
-    if (keywordsStore.currentProjectId) {
+    if (project.currentProjectId) {
       console.log("[StopWords] Reloading keywords after stopword deleted");
-      await keywordsStore.loadKeywords(keywordsStore.currentProjectId, {
+      await keywordsStore.loadKeywords(project.currentProjectId, {
         skip: 0,
-        limit: keywordsStore.windowSize,
+        limit: KEYWORDS_REFRESH_LIMIT,
         sort: keywordsStore.sort,
       });
     }
@@ -713,11 +714,11 @@ async function deleteAll() {
     await stopwordsStore.deleteAllStopwords();
 
     // Перезагружаем данные keywords, чтобы обновились колонки "Целевой запрос" и "Правило исключения"
-    if (keywordsStore.currentProjectId) {
+    if (project.currentProjectId) {
       console.log("[StopWords] Reloading keywords after all stopwords deleted");
-      await keywordsStore.loadKeywords(keywordsStore.currentProjectId, {
+      await keywordsStore.loadKeywords(project.currentProjectId, {
         skip: 0,
-        limit: keywordsStore.windowSize,
+        limit: KEYWORDS_REFRESH_LIMIT,
         sort: keywordsStore.sort,
       });
     }

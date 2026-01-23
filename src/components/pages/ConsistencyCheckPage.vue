@@ -9,7 +9,7 @@
         />
       </div>
 
-      <KeywordsTable columnsKey="keywords-consistency" />
+      <KeywordsTable class="table-fill" columnsKey="keywords-consistency" />
     </el-main>
   </el-container>
 </template>
@@ -27,5 +27,13 @@ onMounted(() => {
 <style scoped>
 .body-main {
   height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.table-fill {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 </style>

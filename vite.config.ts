@@ -8,6 +8,9 @@ const projectRoot = fileURLToPath(new URL('.', import.meta.url))
 
 export default defineConfig({
   base: './',
+  define: {
+    __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '0.0.0'),
+  },
   resolve: {
     alias: {
       fs: resolve(projectRoot, 'src/shims/fs-browser.ts'),

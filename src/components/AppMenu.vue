@@ -83,6 +83,7 @@
 
       <!-- Integrations removed for debugging -->
     </el-menu>
+    <div class="menu-footer">v{{ appVersion }}</div>
   </div>
 </template>
 
@@ -98,6 +99,9 @@ import {
   CircleCheck,
 } from "@element-plus/icons-vue";
 const project = useProjectStore();
+
+const appVersion =
+  typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "0.0.0";
 
 onMounted(() => {
   console.log("[AppMenu] mounted, activePage=", project.activePage);
@@ -159,6 +163,8 @@ const handleMenuSelect = (index) => {
 
 <style>
 .menu-container {
+  display: flex;
+  flex-direction: column;
   height: 100%;
   overflow-x: hidden;
 }
@@ -168,10 +174,20 @@ const handleMenuSelect = (index) => {
   max-width: 100%;
   box-sizing: border-box;
   height: 100%;
+  flex: 1 1 auto;
 }
 .menu-container {
   background-color: var(--el-bg-color, #fff);
   min-height: 0;
+}
+
+.menu-footer {
+  padding: 6px 8px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--el-text-color-secondary);
+  border-top: 1px solid var(--el-border-color-light, #e5e7eb);
+  user-select: none;
 }
 
 /* Уменьшаем вертикальные отступы между пунктами меню */
