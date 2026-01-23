@@ -18,8 +18,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       devOptions: {
-        enabled: true,
-        type: 'module',
+        enabled: false,
       },
       manifest: {
         name: 'Keywords Analytics',

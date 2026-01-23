@@ -35,6 +35,9 @@
                     style="width: 100%"
                   />
                 </div>
+                <div v-if="inputMode === 'regex'" class="text-xs text-gray-500">
+                  Пример: <code>\bfree\b</code> или <code>^test</code>.
+                </div>
               </div>
               <div
                 v-if="invalidRegexLines.length"
@@ -109,31 +112,30 @@
         <div class="text-sm" style="overflow-y: auto">
           <div class="mb-2">
             <strong>Цель:</strong><br />
-            Автоматическое исключение нерелевантных ключевых слов из списка
-            целевых запросов.
+            Автоматически убрать нерелевантные ключевые фразы из списка целевых.
           </div>
 
           <div class="mb-2">
             <strong>Описание:</strong><br />
-            Стоп-слово — это слово или шаблон, при совпадении которого ключевая
-            фраза перестаёт считаться целевой.<br />
-            Есть два варианта записи:
+            Стоп-слово — это слово или шаблон. Если ключевая фраза совпала со
+            стоп-словом, она исключается из целевых.<br />
+            Формат записи бывает двух типов:
             <ul class="list-disc">
               <li>
-                Обычное слово — сравнивается как подстрока без учёта регистра
-                (все символы приводятся к нижнему регистру).
+                Обычное слово — ищется как подстрока без учёта регистра (ввод
+                приводится к нижнему регистру).
               </li>
-              <li>Регулярное выражение — сравнивается по правилам regex.</li>
+              <li>Регулярное выражение — применяется по правилам regex.</li>
             </ul>
           </div>
 
           <div>
             <div class="mt-2">
-              <strong>Что можно использовать в <code>pattern</code></strong>
+              <strong>Что можно использовать в <code>pattern</code>:</strong>
               <ul class="list-disc">
                 <li>
-                  <strong>Символьные классы</strong> описывают набор символов в
-                  одной позиции:
+                  <strong>Символьные классы</strong> — набор символов в одной
+                  позиции:
                   <ul class="list-disc">
                     <li><code>\d</code> — любая цифра (0-9).</li>
                     <li>
@@ -171,7 +173,7 @@
                   </ul>
                 </li>
                 <li>
-                  <strong>Квантификаторы</strong> задают количество повторений:
+                  <strong>Квантификаторы</strong> — количество повторений:
                   <ul class="list-disc">
                     <li><code>?</code> — 0 или 1 раз (опционально).</li>
                     <li><code>*</code> — 0 и более раз (жадно).</li>
@@ -182,7 +184,7 @@
                   </ul>
                 </li>
                 <li>
-                  <strong>Якоря</strong> для точного позиционирования:
+                  <strong>Якоря</strong> — фиксируют позицию:
                   <ul class="list-disc">
                     <li><code>^</code> — начало строки.</li>
                     <li><code>$</code> — конец строки.</li>
@@ -209,7 +211,7 @@
             </div>
 
             <div class="mt-2">
-              <strong>flags</strong>
+              <strong>Флаги:</strong>
               <ul class="list-disc">
                 <li>
                   <code>i</code> — регистронезависимый поиск; добавляется
@@ -223,9 +225,7 @@
             </div>
 
             <div class="mt-2">
-              <strong
-                >Примеры использования (вводите только тело без //):</strong
-              >
+              <strong> Примеры (вводите только тело без //): </strong>
               <ul class="list-disc">
                 <li>
                   <code>^test</code> — отключит ключи, начинающиеся с «test»
@@ -290,7 +290,7 @@ const stopWordsText = ref("");
 const inputMode = ref<"text" | "regex">("text");
 const drawer = ref(false);
 const textareaPlaceholder = computed(() =>
-  inputMode.value === "regex" ? "Введите шаблон" : "Введите значение"
+  inputMode.value === "regex" ? "Введите шаблон" : "Введите значение",
 );
 // Use store data instead of local ref
 const stopWords = computed(() => stopwordsStore.stopwords);
@@ -319,7 +319,7 @@ const inputLines = computed(() => {
 
 const regexLines = computed(() => {
   return inputLines.value.filter(
-    (l) => !!extractRegexParts(l, inputMode.value)
+    (l) => !!extractRegexParts(l, inputMode.value),
   );
 });
 
@@ -338,7 +338,7 @@ const invalidRegexLines = computed(() => {
 
 // UI / progress flags (use store values)
 const isAddingWithProgress = computed(
-  () => stopwordsStore.isAddingWithProgress
+  () => stopwordsStore.isAddingWithProgress,
 );
 const addProgress = computed(() => stopwordsStore.addProgress);
 const addProgressText = computed(() => stopwordsStore.addProgressText);
@@ -347,13 +347,13 @@ const loadingMore = computed(() => stopwordsStore.loadingMore);
 const sort = computed(() => stopwordsStore.sort);
 const stopwordsCount = computed(() => stopwordsStore.totalCount || 0);
 const stopwordsProcessBusy = computed(
-  () => keywordsStore.running || keywordsStore.stopwordsRunning
+  () => keywordsStore.running || keywordsStore.stopwordsRunning,
 );
 const canRunStopwordsProcess = computed(
   () =>
     !!project.currentProjectId &&
     stopwordsCount.value > 0 &&
-    !stopwordsProcessBusy.value
+    !stopwordsProcessBusy.value,
 );
 const emit = defineEmits(["close-dialog"]);
 
@@ -501,7 +501,7 @@ function updateStopwordsProgress(processed: number, total: number) {
   if (total > 0) {
     keywordsStore.stopwordsPercent = Math.min(
       100,
-      Math.round((processed / total) * 100)
+      Math.round((processed / total) * 100),
     );
   } else {
     keywordsStore.stopwordsPercent = 0;
@@ -596,11 +596,11 @@ async function runStopwordsProcess() {
 
     if (matched > 0) {
       ElMessage.success(
-        `Фильтрация по стоп-словам завершена, совпадений ${matched}`
+        `Фильтрация по стоп-словам завершена, совпадений ${matched}`,
       );
     } else {
       ElMessage.info(
-        "Фильтрация по стоп-словам завершена, совпадений не найдено"
+        "Фильтрация по стоп-словам завершена, совпадений не найдено",
       );
     }
   } catch (error) {
@@ -634,7 +634,7 @@ async function addStopWords() {
   // Prevent submission if any regex lines are invalid
   if (invalidRegexLines.value && invalidRegexLines.value.length > 0) {
     ElMessage.error(
-      "Есть неверные регулярные выражения. Исправьте их перед отправкой."
+      "Есть неверные регулярные выражения. Исправьте их перед отправкой.",
     );
     return;
   }
@@ -674,7 +674,7 @@ async function removeRow(row) {
         type: "error",
         icon: markRaw(Delete),
         customClass: "delete-msgbox-class",
-      }
+      },
     );
 
     await stopwordsStore.deleteStopword(row.id);
@@ -707,7 +707,7 @@ async function deleteAll() {
         type: "error",
         icon: markRaw(Delete),
         customClass: "delete-msgbox-class",
-      }
+      },
     );
 
     await stopwordsStore.deleteAllStopwords();
@@ -745,7 +745,7 @@ watch(
       stopwordsStore.initializeState();
     }
   },
-  { immediate: true }
+  { immediate: true },
 );
 </script>
 

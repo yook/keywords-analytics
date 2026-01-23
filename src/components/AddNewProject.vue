@@ -128,14 +128,14 @@ function openNewProjectDialog() {
 }
 
 const allowClose = computed(
-  () => !!(project.projectsList && project.projectsList.length > 0)
+  () => !!(project.projectsList && project.projectsList.length > 0),
 );
 
 function onRequestClose() {
   if (!allowClose.value) {
     ElMessage.warning(
       t("addProject.createFirstWarning") ||
-        "Создайте проект прежде чем закрывать диалог"
+        "Создайте проект прежде чем закрывать диалог",
     );
     showNewProjectDialog.value = true;
     return;
@@ -160,7 +160,7 @@ watch(
       autoOpened.value = true;
     }
   },
-  { immediate: true, deep: false }
+  { immediate: true, deep: false },
 );
 
 watch(
@@ -173,10 +173,10 @@ watch(
       showNewProjectDialog.value = true;
       ElMessage.warning(
         t("addProject.createFirstWarning") ||
-          "Создайте проект прежде чем закрывать диалог"
+          "Создайте проект прежде чем закрывать диалог",
       );
     }
-  }
+  },
 );
 </script>
 
@@ -214,13 +214,14 @@ watch(
 }
 
 html.dark .add-project-btn {
-  background-color: var(--el-color-primary) !important;
-  border-color: var(--el-color-primary) !important;
-  color: #ffffff !important;
+  background-color: #2d3748 !important;
+  border-color: #4a5568 !important;
+  color: #e2e8f0 !important;
 }
 
 html.dark .add-project-btn:hover {
-  background-color: var(--el-color-primary-light-3) !important;
-  border-color: var(--el-color-primary-light-3) !important;
+  background-color: #4a5568 !important;
+  border-color: #718096 !important;
+  color: #f7fafc !important;
 }
 </style>
