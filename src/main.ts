@@ -8,6 +8,7 @@ import { createI18n } from 'vue-i18n'
 import { useDexie } from './composables/useDexie'
 import messages from './locales'
 import { registerSW } from 'virtual:pwa-register'
+import { useLemmaDictSharedWorker } from './composables/useLemmaDictSharedWorker'
 
 const i18n = createI18n({
   legacy: false,
@@ -31,6 +32,26 @@ const i18n = createI18n({
   app.use(ElementPlus)
   app.use(i18n)
   app.mount('#app')
+
+  // Preload lemma dictionary in background (idle) to avoid delay on first consistency check
+  try {
+    const warmLemmaDict = () => {
+      try {
+        const lemmaWorker = useLemmaDictSharedWorker()
+        lemmaWorker.ensure()
+      } catch (e) {
+        console.warn('Lemma dictionary preload failed', e)
+      }
+    }
+    const win = window as any
+    if (typeof win.requestIdleCallback === 'function') {
+      win.requestIdleCallback(warmLemmaDict, { timeout: 2000 })
+    } else {
+      setTimeout(warmLemmaDict, 0)
+    }
+  } catch (e) {
+    console.warn('Lemma dictionary preload scheduling failed', e)
+  }
 
   // Required for installability (Chrome shows the install icon only when a SW is registered)
   registerSW({ immediate: true })
