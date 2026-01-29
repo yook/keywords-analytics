@@ -130,7 +130,7 @@ const allColumns = [
   { prop: "blocking_rule", name: "Правило исключения", width: 240 },
   { prop: "created_at", name: t("table.date"), width: 180 },
   { prop: "category_info", name: "Категория", width: 240 },
-  { prop: "classification_label", name: "Классификация (ML)", width: 180 },
+  { prop: "classification_label", name: "Классификация", width: 180 },
   {
     prop: "classification_score",
     name: "Уверенность классификации",
@@ -142,7 +142,12 @@ const allColumns = [
   { prop: "tags", name: "Теги", width: 200 },
   { prop: "is_valid_headline", name: "Проверка согласованности", width: 140 },
   { prop: "validation_reason", name: "Правило согласованности", width: 320 },
-  { prop: "_actions", name: "Actions", width: 50 },
+  { prop: "moderation_flagged", name: "AI модерация", width: 160 },
+  {
+    prop: "moderation_categories",
+    name: "Критерии модерации",
+    width: 260,
+  },
 ];
 
 // Ключи всех доступных колонок
@@ -158,6 +163,8 @@ const getDefaultColumnsForScope = (scope) => {
       return ["cluster_label", "cluster_score"];
     case "keywords-consistency":
       return ["is_valid_headline", "validation_reason"];
+    case "keywords-moderation":
+      return ["moderation_flagged", "moderation_categories"];
     default:
       return ["created_at", "lemma", "tags"];
   }

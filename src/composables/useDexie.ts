@@ -20,6 +20,10 @@ type Keyword = {
   cluster_score?: number;
   target_query?: number | boolean;
   is_valid_headline?: number | boolean;
+  moderation_flagged?: number | boolean;
+  moderation_categories?: string;
+  moderation_checked_at?: string;
+  moderation_model?: string;
 }
 
 type StopWord = {
@@ -238,15 +242,14 @@ export function useDexie() {
   async function bulkPutKeywords(items: Keyword[]) {
     const db = await init()
     if (!items || items.length === 0) return
-    await db.transaction('rw', db.keywords, async () => {
-      // ensure deterministic ids for items that miss them
-      for (const it of items) {
-        if ((!it.id || it.id === '') && it.projectId && it.keyword) {
-          it.id = `${it.projectId}::${encodeURIComponent(it.keyword.trim().toLowerCase())}`
-        }
+    // ensure deterministic ids for items that miss them
+    for (const it of items) {
+      if ((!it.id || it.id === '') && it.projectId && it.keyword) {
+        it.id = `${it.projectId}::${encodeURIComponent(it.keyword.trim().toLowerCase())}`
       }
-      await db.keywords.bulkPut(items)
-    })
+    }
+    // Avoid explicit transaction to prevent PrematureCommitError in async-heavy flows
+    await db.keywords.bulkPut(items)
   }
 
   async function clearKeywords() {

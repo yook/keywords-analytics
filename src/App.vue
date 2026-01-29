@@ -16,6 +16,9 @@ const KeywordsFilter = defineAsyncComponent(
 const ClassificationPage = defineAsyncComponent(
   () => import("./components/pages/ClassificationPage.vue"),
 );
+const AiModeratorPage = defineAsyncComponent(
+  () => import("./components/pages/AiModeratorPage.vue"),
+);
 const ConsistencyCheckPage = defineAsyncComponent(
   () => import("./components/pages/ConsistencyCheckPage.vue"),
 );
@@ -59,6 +62,8 @@ const currentPageComponent = computed(() => {
       return KeywordsPage;
     case "filter":
       return KeywordsFilter;
+    case "moderation":
+      return AiModeratorPage;
     case "typing":
       return ClassificationPage;
     case "clustering":

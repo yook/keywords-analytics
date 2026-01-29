@@ -23,6 +23,15 @@
           "
           :duration="7"
         />
+        <el-button
+          v-if="pageType === 'moderationRunning'"
+          type="primary"
+          link
+          size="small"
+          @click="emit('help')"
+        >
+          Как это работает?
+        </el-button>
         <!-- <el-dropdown
           v-if="!keywordsStore.running && !keywordsStore.stopwordsRunning"
           class="ml-3"
@@ -71,11 +80,13 @@
                     ? "Определение класса"
                     : pageType === "clusteringRunning"
                       ? "Запустить кластеризацию"
-                      : pageType === "morphologyRunning"
-                        ? "Запустить лемматизацию"
-                        : pageType === "morphologyCheckRunning"
-                          ? "Запустить проверку согласованности"
-                          : "Запустить процесс"
+                      : pageType === "moderationRunning"
+                        ? "Запустить AI модерацию"
+                        : pageType === "morphologyRunning"
+                          ? "Запустить лемматизацию"
+                          : pageType === "morphologyCheckRunning"
+                            ? "Запустить проверку согласованности"
+                            : "Запустить процесс"
           }}
         </el-button>
       </div>
@@ -168,7 +179,7 @@
 
 <script setup>
 const keywords = ref("");
-import { ref, watch, computed, defineProps } from "vue";
+import { ref, watch, computed, defineProps, defineEmits } from "vue";
 import { ElMessage } from "element-plus";
 import { useI18n } from "vue-i18n";
 import { CirclePlus, VideoPlay, VideoPause } from "@element-plus/icons-vue";
@@ -187,6 +198,7 @@ const props = defineProps({
   pageType: { type: String, default: "isAddingWithProgress" },
   buttonPlain: { type: Boolean, default: false },
 });
+const emit = defineEmits(["help"]);
 
 const dialogVisible = ref(false);
 const stopWordsDialogVisible = ref(false);
@@ -203,6 +215,10 @@ const handlePrimaryAction = () => {
   }
   if (props.pageType === "clusteringRunning") {
     clusteringConfigDialogVisible.value = true;
+    return;
+  }
+  if (props.pageType === "moderationRunning") {
+    startModerationOnly();
     return;
   }
   if (props.pageType === "morphologyCheckRunning") {
@@ -240,6 +256,7 @@ const processLabel = computed(() => {
     return "Кластеризация";
   }
   if (keywordsStore.stopwordsRunning) return "Фильтр по стоп-словам";
+  if (keywordsStore.moderationRunning) return "AI модерация";
   if (keywordsStore.morphologyRunning) return "Лемматизация";
   if (keywordsStore.morphologyCheckRunning) return "Проверка согласованности";
   return "";
@@ -284,6 +301,7 @@ const showProcessInfo = computed(() => {
     keywordsStore.typingRunning ||
     keywordsStore.clusteringRunning ||
     keywordsStore.stopwordsRunning ||
+    keywordsStore.moderationRunning ||
     keywordsStore.morphologyRunning ||
     keywordsStore.morphologyCheckRunning
   );
@@ -293,6 +311,7 @@ const currentProgress = computed(() => {
   if (keywordsStore.isAddingWithProgress) return keywordsStore.addProgress;
   if (keywordsStore.typingRunning) return keywordsStore.typingPercent;
   if (keywordsStore.stopwordsRunning) return keywordsStore.stopwordsPercent;
+  if (keywordsStore.moderationRunning) return keywordsStore.moderationPercent;
   if (keywordsStore.morphologyCheckRunning)
     return keywordsStore.morphologyCheckPercent;
   if (keywordsStore.morphologyRunning) return keywordsStore.morphologyPercent;
@@ -407,6 +426,20 @@ function startStopWordsOnly() {
 }
 function startClusteringOnly() {
   keywordsStore.startClusteringOnly();
+}
+async function startModerationOnly() {
+  if (!keywordsStore.keywordCount) {
+    ElMessage.warning("Нет ключевых слов для обработки");
+    return;
+  }
+  try {
+    const pid = project.currentProjectId
+      ? String(project.currentProjectId)
+      : "anon";
+    await keywordsStore.startModeration(pid);
+  } catch (e) {
+    console.error("[KeywordsAdd] Error starting moderation:", e);
+  }
 }
 async function startMorphologyOnly() {
   if (!keywordsStore.keywordCount) {
@@ -533,6 +566,17 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.title-with-help {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.help-link {
+  margin-top: 6px;
+  align-self: center;
 }
 
 /* Стили для темной темы */

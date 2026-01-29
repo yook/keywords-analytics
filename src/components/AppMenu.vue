@@ -14,6 +14,7 @@
           'is-active':
             project.activePage === '2' ||
             project.activePage === 'filter' ||
+            project.activePage === 'moderation' ||
             project.activePage === 'typing' ||
             project.activePage === 'clustering' ||
             project.activePage === 'consistency',
@@ -50,6 +51,15 @@
         <el-menu-item-group title="Векторный поиск">
           <el-menu-item
             :index="'2-3'"
+            :class="{ 'is-active': project.activePage === 'moderation' }"
+          >
+            <el-icon
+              ><img src="/icons8-sparkling-24.png" style="width: 18px"
+            /></el-icon>
+            <span>AI модератор</span>
+          </el-menu-item>
+          <el-menu-item
+            :index="'2-4'"
             :class="{ 'is-active': project.activePage === 'typing' }"
           >
             <el-icon
@@ -58,7 +68,7 @@
             <span>Определение класса</span>
           </el-menu-item>
           <el-menu-item
-            :index="'2-4'"
+            :index="'2-5'"
             :class="{ 'is-active': project.activePage === 'clustering' }"
           >
             <el-icon
@@ -66,7 +76,7 @@
             /></el-icon>
             <span>Распределение на кластеры</span>
           </el-menu-item>
-          <el-menu-item :index="'2-5'" disabled>
+          <el-menu-item :index="'2-6'" disabled>
             <el-icon
               ><img src="/icons8-sparkling-24.png" style="width: 18px"
             /></el-icon>
@@ -129,14 +139,20 @@ const handleMenuSelect = (index) => {
       localStorage.setItem("activeMenuItem", "consistency");
       return;
     }
-    // Special case: open typing page for определение класса
+    // Special case: open AI moderation page
     if (index === "2-3") {
+      project.activePage = "moderation";
+      localStorage.setItem("activeMenuItem", "moderation");
+      return;
+    }
+    // Special case: open typing page for определение класса
+    if (index === "2-4") {
       project.activePage = "typing";
       localStorage.setItem("activeMenuItem", "typing");
       return;
     }
     // Special case: open clustering page for распределение на кластеры
-    if (index === "2-4") {
+    if (index === "2-5") {
       project.activePage = "clustering";
       localStorage.setItem("activeMenuItem", "clustering");
       return;
@@ -144,8 +160,8 @@ const handleMenuSelect = (index) => {
     // Default: open config dialog for other tabs
     project.activePage = "2";
     const map = {
-      "2-4": "clustering",
-      "2-5": "categorization",
+      "2-5": "clustering",
+      "2-6": "categorization",
     };
     const tab = map[index];
     if (tab) {

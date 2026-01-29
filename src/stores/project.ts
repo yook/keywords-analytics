@@ -177,6 +177,11 @@ export const useProjectStore = defineStore('project', {
         }
       } catch (e) {
         console.warn('Failed to decrypt OpenAI key', e);
+        try {
+          localStorage.removeItem('openaiKey_global');
+        } catch (er) {}
+        this.openaiApiKey = '';
+        return '';
       }
 
       return '';

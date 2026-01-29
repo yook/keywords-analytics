@@ -308,6 +308,29 @@
                       <span v-else>{{ row.is_valid_headline }}</span>
                     </div>
                   </template>
+                  <template v-else-if="column.prop === 'moderation_flagged'">
+                    <div class="cell-center">
+                      <el-icon
+                        v-if="
+                          row.moderation_flagged === 1 ||
+                          row.moderation_flagged === true
+                        "
+                        style="color: var(--el-color-success); font-size: 18px"
+                      >
+                        <Check />
+                      </el-icon>
+                      <el-icon
+                        v-else-if="
+                          row.moderation_flagged === 0 ||
+                          row.moderation_flagged === false
+                        "
+                        style="color: var(--el-color-danger); font-size: 18px"
+                      >
+                        <Close />
+                      </el-icon>
+                      <span v-else>{{ row.moderation_flagged }}</span>
+                    </div>
+                  </template>
                   <template v-else>
                     {{
                       formatCellValue(

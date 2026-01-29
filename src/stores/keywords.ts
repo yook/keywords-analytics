@@ -3,6 +3,7 @@ import { ElMessage } from 'element-plus'
 import { useKeywordWorker } from '../composables/useKeywordWorker'
 import { useMorphologyWorker } from '../composables/useMorphologyWorker'
 import { useConsistencyWorker } from '../composables/useConsistencyWorker'
+import { useModerationWorker } from '../composables/useModerationWorker'
 import { isLemmaDictReady } from '../composables/lemmaDictStatus'
 import { useProjectStore } from './project'
 import { useDexie } from '../composables/useDexie'
@@ -19,6 +20,10 @@ type KeywordRow = {
   blocking_rule?: string
   classification_label?: string
   classification_score?: number
+  moderation_flagged?: number | boolean
+  moderation_categories?: string
+  moderation_checked_at?: string
+  moderation_model?: string
 }
 
 type SortDirection = 'ascending' | 'descending'
@@ -97,6 +102,7 @@ export const useKeywordsStore = defineStore('keywords', {
     categorizationRunning: false as boolean,
     typingRunning: false as boolean,
     clusteringRunning: false as boolean,
+    moderationRunning: false as boolean,
     morphologyRunning: false as boolean,
     morphologyCheckRunning: false as boolean,
 
@@ -106,6 +112,7 @@ export const useKeywordsStore = defineStore('keywords', {
     categorizationPercent: 0,
     typingPercent: 0,
     clusteringPercent: 0,
+    moderationPercent: 0,
     morphologyPercent: 0,
     morphologyCheckPercent: 0,
 
@@ -355,6 +362,7 @@ export const useKeywordsStore = defineStore('keywords', {
     stopCurrentProcess() {
       this.running = false
       this.stopwordsRunning = false
+      this.moderationRunning = false
     },
 
     startAllProcesses() {
@@ -375,6 +383,120 @@ export const useKeywordsStore = defineStore('keywords', {
     startClusteringOnly() {
       this.clusteringRunning = true
       this.running = true
+    },
+    async startModeration(projectId?: string) {
+      const pid = projectId || (useProjectStore().currentProjectId || 'anon')
+      const project = useProjectStore()
+      this.currentProcessLabel = 'AI модерация'
+      this.moderationRunning = true
+      this.running = true
+      this.moderationPercent = 0
+      this.currentProcessed = 0
+      this.currentTotal = 0
+      try {
+        const apiKey = await project.getOpenaiApiKey()
+        if (!apiKey) {
+          ElMessage.error('Укажите OpenAI API ключ в настройках проекта')
+          return false
+        }
+
+        const dexie = useDexie()
+        const db = await dexie.init()
+        let rows: any[] = []
+        try {
+          const table = (db as any).keywords
+          if (table && typeof table.where === 'function') {
+            rows = await table.where('projectId').equals(String(pid)).toArray()
+          } else {
+            rows = await db.keywords.toArray()
+            rows = rows.filter((k: any) => String(k.projectId) === String(pid))
+          }
+        } catch (e) {
+          rows = await db.keywords.toArray()
+          rows = rows.filter((k: any) => String(k.projectId) === String(pid))
+        }
+
+        if (!rows.length) {
+          ElMessage.warning('Нет ключевых слов для обработки')
+          return false
+        }
+
+        const items = rows.map((row: any) => ({
+          id: row.id,
+          keyword: row.keyword,
+        }))
+
+        const worker = useModerationWorker()
+        const model = 'omni-moderation-latest'
+        const result = await worker.startModeration(
+          { items, apiKey, model, chunkSize: 50 },
+          (msg: any) => {
+            if (typeof msg.processed === 'number') {
+              this.currentProcessed = msg.processed
+            }
+            if (typeof msg.total === 'number') {
+              this.currentTotal = msg.total
+            }
+            if (typeof msg.percent === 'number') {
+              this.moderationPercent = Math.min(
+                100,
+                Math.max(0, Math.round(msg.percent))
+              )
+            } else if (
+              typeof msg.processed === 'number' &&
+              typeof msg.total === 'number' &&
+              msg.total > 0
+            ) {
+              this.moderationPercent = Math.min(
+                100,
+                Math.max(0, Math.round((msg.processed / msg.total) * 100))
+              )
+            }
+          }
+        )
+
+        const results = Array.isArray(result?.results) ? result.results : []
+        const resultMap = new Map(
+          results.map((r: any) => [r.id, r])
+        )
+        const now = new Date().toISOString()
+        const updated = rows.map((row: any) => {
+          const r = resultMap.get(row.id)
+          if (!r) return row
+          return {
+            ...row,
+            moderation_flagged: r.flagged ? 0 : 1,
+            moderation_categories: Array.isArray(r.categories)
+              ? r.categories.join(', ')
+              : '',
+            moderation_checked_at: now,
+            moderation_model: model,
+          }
+        })
+
+        await dexie.bulkPutKeywords(updated)
+
+        try {
+          const refreshOffset = typeof this.windowStart === 'number' ? this.windowStart : 0
+          await this.loadKeywords(String(pid), { offset: refreshOffset, limit: 300, background: true })
+        } catch (e) {
+          console.warn('[startModeration] failed to reload keywords', e)
+        }
+      } catch (e) {
+        console.warn('[startModeration] failed', e)
+        ElMessage.error('Ошибка при запуске AI модерации')
+      } finally {
+        const hadTotal = this.currentTotal > 0
+        this.moderationRunning = false
+        this.running = false
+        if (!hadTotal) {
+          this.moderationPercent = 0
+        }
+        this.currentProcessed = 0
+        this.currentTotal = 0
+        this.currentProcessLabel = ''
+      }
+      return true
     },
     async startMorphology(projectId?: string) {
       const pid = projectId || (useProjectStore().currentProjectId || 'anon')
