@@ -48,11 +48,13 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
 import { Sunny, Moon, Connection } from "@element-plus/icons-vue";
 import AddNewProject from "./AddNewProject.vue";
 import { useProjectStore } from "../stores/project";
 
 const project = useProjectStore();
+const router = useRouter();
 const { t } = useI18n();
 
 const isLight = ref(!document.documentElement.classList.contains("dark"));
@@ -83,8 +85,8 @@ function changeProject(id: string | null) {
 }
 
 function openIntegrations() {
-  // Open integrations page
-  project.activePage = "integrations";
+  // Navigate to integrations page using Router
+  router.push("/integrations");
 }
 </script>
 
