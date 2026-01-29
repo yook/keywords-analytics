@@ -26,7 +26,7 @@ export default defineConfig({
       manifest: {
         name: 'Keywords Analytics',
         short_name: 'Keywords',
-        start_url: '.',
+        start_url: '/#/keywords',
         scope: '.',
         display: 'standalone',
         background_color: '#ffffff',

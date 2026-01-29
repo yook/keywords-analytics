@@ -21,7 +21,7 @@ export const useProjectStore = defineStore('project', {
     // compatibility: alias used by newer components
     projectsLoaded: false as boolean,
     currentProjectId: localStorage.getItem('currentProjectId') as string | null,
-    activePage: (localStorage.getItem('activeMenuItem') || '2') as string,
+    activePage: (localStorage.getItem('activeMenuItem') || '/keywords') as string,
     openaiApiKey: (localStorage.getItem('openaiApiKey') || '') as string,
     data: {} as any,
   }),

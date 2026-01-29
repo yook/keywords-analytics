@@ -1,7 +1,7 @@
 <template>
   <div class="menu-container">
     <el-menu
-      :default-active="project.activePage"
+      :default-active="currentMenuIndex"
       collapse
       class="el-menu"
       @select="handleMenuSelect"
@@ -9,74 +9,86 @@
     >
       <!-- Keywords menu with nested submenu groups -->
       <el-sub-menu
-        :index="'2'"
+        index="keywords"
         :class="{
-          'is-active':
-            project.activePage === '2' ||
-            project.activePage === 'filter' ||
-            project.activePage === 'moderation' ||
-            project.activePage === 'typing' ||
-            project.activePage === 'clustering' ||
-            project.activePage === 'consistency',
+          'is-active': isKeywordsActive,
         }"
       >
         <template #title>
           <el-icon><PriceTag /></el-icon>
           <span>{{ i18n.global.t("menu.keywords") }}</span>
         </template>
-        <el-menu-item
-          :index="'2-0'"
-          :class="{ 'is-active': project.activePage === '2' }"
-        >
-          <el-icon><Plus /></el-icon>
-          <span>Добавить запросы</span>
-        </el-menu-item>
+        <RouterLink to="/keywords" custom v-slot="{ navigate }">
+          <el-menu-item
+            index="keywords-main"
+            :class="{ 'is-active': route.path === '/keywords' }"
+            @click="navigate"
+          >
+            <el-icon><Plus /></el-icon>
+            <span>Добавить запросы</span>
+          </el-menu-item>
+        </RouterLink>
         <el-menu-item-group title="Морфолгический поиск">
-          <el-menu-item
-            :index="'2-1'"
-            :class="{ 'is-active': project.activePage === 'filter' }"
-          >
-            <el-icon><Filter /></el-icon>
-            <span>Фильтр по стоп-словам</span>
-          </el-menu-item>
-          <el-menu-item
-            :index="'2-2'"
-            :class="{ 'is-active': project.activePage === 'consistency' }"
-          >
-            <el-icon><CircleCheck /></el-icon>
-            <span>Проверка согласованности</span>
-          </el-menu-item>
+          <RouterLink to="/filter" custom v-slot="{ navigate }">
+            <el-menu-item
+              index="keywords-filter"
+              :class="{ 'is-active': route.path === '/filter' }"
+              @click="navigate"
+            >
+              <el-icon><Filter /></el-icon>
+              <span>Фильтр по стоп-словам</span>
+            </el-menu-item>
+          </RouterLink>
+          <RouterLink to="/consistency" custom v-slot="{ navigate }">
+            <el-menu-item
+              index="consistency"
+              :class="{ 'is-active': route.path === '/consistency' }"
+              @click="navigate"
+            >
+              <el-icon><CircleCheck /></el-icon>
+              <span>Проверка согласованности</span>
+            </el-menu-item>
+          </RouterLink>
         </el-menu-item-group>
 
         <el-menu-item-group title="Векторный поиск">
-          <el-menu-item
-            :index="'2-3'"
-            :class="{ 'is-active': project.activePage === 'moderation' }"
-          >
-            <el-icon
-              ><img src="/icons8-sparkling-24.png" style="width: 18px"
-            /></el-icon>
-            <span>AI модератор</span>
-          </el-menu-item>
-          <el-menu-item
-            :index="'2-4'"
-            :class="{ 'is-active': project.activePage === 'typing' }"
-          >
-            <el-icon
-              ><img src="/icons8-sparkling-24.png" style="width: 18px"
-            /></el-icon>
-            <span>Определение класса</span>
-          </el-menu-item>
-          <el-menu-item
-            :index="'2-5'"
-            :class="{ 'is-active': project.activePage === 'clustering' }"
-          >
-            <el-icon
-              ><img src="/icons8-sparkling-24.png" style="width: 18px"
-            /></el-icon>
-            <span>Распределение на кластеры</span>
-          </el-menu-item>
-          <el-menu-item :index="'2-6'" disabled>
+          <RouterLink to="/moderation" custom v-slot="{ navigate }">
+            <el-menu-item
+              index="moderation"
+              :class="{ 'is-active': route.path === '/moderation' }"
+              @click="navigate"
+            >
+              <el-icon
+                ><img src="/icons8-sparkling-24.png" style="width: 18px"
+              /></el-icon>
+              <span>AI модератор</span>
+            </el-menu-item>
+          </RouterLink>
+          <RouterLink to="/classification" custom v-slot="{ navigate }">
+            <el-menu-item
+              index="classification"
+              :class="{ 'is-active': route.path === '/classification' }"
+              @click="navigate"
+            >
+              <el-icon
+                ><img src="/icons8-sparkling-24.png" style="width: 18px"
+              /></el-icon>
+              <span>Определение класса</span>
+            </el-menu-item>
+          </RouterLink>
+          <RouterLink to="/clustering" custom v-slot="{ navigate }">
+            <el-menu-item
+              index="clustering"
+              :class="{ 'is-active': route.path === '/clustering' }"
+              @click="navigate"
+            >
+              <el-icon
+                ><img src="/icons8-sparkling-24.png" style="width: 18px"
+              /></el-icon>
+              <span>Распределение на кластеры</span>
+            </el-menu-item>
+          </RouterLink>
+          <el-menu-item index="categorization" disabled>
             <el-icon
               ><img src="/icons8-sparkling-24.png" style="width: 18px"
             /></el-icon>
@@ -85,20 +97,25 @@
         </el-menu-item-group>
       </el-sub-menu>
 
-      <!-- Add Settings item next for progressive testing -->
-      <el-menu-item index="5">
-        <el-icon><Setting /></el-icon>
-        <template #title>{{ i18n.global.t("menu.settings") }}</template>
-      </el-menu-item>
-
-      <!-- Integrations removed for debugging -->
+      <!-- Settings -->
+      <RouterLink to="/settings" custom v-slot="{ navigate }">
+        <el-menu-item
+          index="settings"
+          :class="{ 'is-active': route.path === '/settings' }"
+          @click="navigate"
+        >
+          <el-icon><Setting /></el-icon>
+          <template #title>{{ i18n.global.t("menu.settings") }}</template>
+        </el-menu-item>
+      </RouterLink>
     </el-menu>
     <div class="menu-footer">v{{ appVersion }}</div>
   </div>
 </template>
 
-<script setup>
-import { ref, onMounted } from "vue";
+<script setup lang="ts">
+import { computed } from "vue";
+import { useRouter, useRoute } from "vue-router";
 import { i18n } from "../i18n";
 import { useProjectStore } from "../stores/project";
 import {
@@ -108,72 +125,34 @@ import {
   Filter,
   CircleCheck,
 } from "@element-plus/icons-vue";
+
+const router = useRouter();
+const route = useRoute();
 const project = useProjectStore();
 
 const appVersion =
   typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "0.0.0";
 
-onMounted(() => {
-  console.log("[AppMenu] mounted, activePage=", project.activePage);
+const isKeywordsActive = computed(() => {
+  return route.path.startsWith("/keywords");
 });
 
-const handleMenuSelect = (index) => {
-  // If a submenu under Keywords selected (indices like "2-1"),
-  // open Keywords page and request proper tab.
-  if (typeof index === "string" && index.startsWith("2-")) {
-    // If user clicked the main 'Keywords' entry (2-0), open Keywords page
-    if (index === "2-0") {
-      project.activePage = "2";
-      localStorage.setItem("activeMenuItem", "2");
-      return;
-    }
-    // Special case: open KeywordsFilter page for stopwords
-    if (index === "2-1") {
-      project.activePage = "filter";
-      localStorage.setItem("activeMenuItem", "filter");
-      return;
-    }
-    // Special case: open consistency-check page
-    if (index === "2-2") {
-      project.activePage = "consistency";
-      localStorage.setItem("activeMenuItem", "consistency");
-      return;
-    }
-    // Special case: open AI moderation page
-    if (index === "2-3") {
-      project.activePage = "moderation";
-      localStorage.setItem("activeMenuItem", "moderation");
-      return;
-    }
-    // Special case: open typing page for определение класса
-    if (index === "2-4") {
-      project.activePage = "typing";
-      localStorage.setItem("activeMenuItem", "typing");
-      return;
-    }
-    // Special case: open clustering page for распределение на кластеры
-    if (index === "2-5") {
-      project.activePage = "clustering";
-      localStorage.setItem("activeMenuItem", "clustering");
-      return;
-    }
-    // Default: open config dialog for other tabs
-    project.activePage = "2";
-    const map = {
-      "2-5": "clustering",
-      "2-6": "categorization",
-    };
-    const tab = map[index];
-    if (tab) {
-      project.crawlerConfigTab = tab;
-      project.crawlerConfigDialog = true;
-    }
-    localStorage.setItem("activeMenuItem", "2");
-    return;
-  }
+const currentMenuIndex = computed(() => {
+  const path = route.path;
+  if (path === "/filter") return "keywords-filter";
+  if (path === "/keywords") return "keywords-main";
+  if (path === "/consistency") return "consistency";
+  if (path === "/moderation") return "moderation";
+  if (path === "/classification") return "classification";
+  if (path === "/clustering") return "clustering";
+  if (path === "/settings") return "settings";
+  if (path.startsWith("/keywords")) return "keywords-main";
+  return "keywords-main";
+});
 
-  project.activePage = index;
-  localStorage.setItem("activeMenuItem", index);
+const handleMenuSelect = (index: string) => {
+  // Navigation is handled by RouterLink, this is for backward compatibility
+  console.log("[AppMenu] Menu selected:", index);
 };
 </script>
 

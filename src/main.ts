@@ -9,6 +9,7 @@ import { useDexie } from './composables/useDexie'
 import messages from './locales'
 import { registerSW } from 'virtual:pwa-register'
 import { useLemmaDictSharedWorker } from './composables/useLemmaDictSharedWorker'
+import router from './router'
 
 const i18n = createI18n({
   legacy: false,
@@ -29,6 +30,7 @@ const i18n = createI18n({
   const app = createApp(App)
   const pinia = createPinia()
   app.use(pinia)
+  app.use(router)
   app.use(ElementPlus)
   app.use(i18n)
   app.mount('#app')
