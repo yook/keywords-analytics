@@ -238,7 +238,7 @@ function persistToProject() {
     project.data.clustering_algorithm = form.value.algorithm;
     project.data.clustering_dbscan_eps = toNumber01(dbscanEps.value);
     project.data.clustering_dbscan_minPts = Number(dbscanMinPts.value);
-    project.updateProject();
+    void project.saveProjectData(projectId);
   } catch (e) {
     console.warn("Failed to persist clustering params to project", e);
   }

@@ -215,8 +215,8 @@ export const useProjectStore = defineStore('project', {
       }
     },
 
-    async updateProject(payload: { id: string | null, name: string }) {
-      if (!payload.id) return;
+    async updateProject(payload?: { id: string | null, name: string }) {
+      if (!payload || !payload.id) return;
       try {
         const db = useDexie()
         await db.init()
