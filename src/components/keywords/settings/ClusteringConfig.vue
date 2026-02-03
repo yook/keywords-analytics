@@ -466,6 +466,10 @@ async function handleClusteringRun() {
   emit("close-dialog");
   isClusteringRunning.value = true;
 
+  // Set store flags for global UI state
+  keywordsStore.clusteringRunning = true;
+  keywordsStore.running = true;
+
   try {
     // Reset progress
     embeddingProgress.value = {
@@ -651,6 +655,9 @@ async function handleClusteringRun() {
     }
   } finally {
     isClusteringRunning.value = false;
+    keywordsStore.clusteringRunning = false;
+    keywordsStore.running = false;
+    keywordsStore.progress = null;
   }
 }
 </script>

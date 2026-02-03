@@ -24,7 +24,7 @@
           :duration="7"
         />
         <el-button
-          v-if="pageType === 'moderationRunning'"
+          v-if="pageType === 'moderationRunning' && !showProcessInfo"
           type="primary"
           link
           size="small"
