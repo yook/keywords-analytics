@@ -167,7 +167,7 @@
 
 <script setup lang="ts">
 import { ref, watch, nextTick } from "vue";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import { useProjectStore } from "../../../stores/project";
 import { useKeywordsStore } from "../../../stores/keywords";
 import { useClusteringWorker } from "../../../composables/useClusteringWorker";
@@ -457,6 +457,31 @@ async function handleClusteringRun() {
     return;
   }
 
+  // Warning for large datasets
+  if (targetKeywords.length > 10000) {
+    try {
+      await ElMessageBox.confirm(
+        `Вы собираетесь кластеризовать ${targetKeywords.length.toLocaleString()} ключевых слов. ` +
+          `Это может занять значительное время (несколько минут) и требовать много ресурсов.\n\n` +
+          `Рекомендации:\n` +
+          `• Используйте фильтры для уменьшения объема данных\n` +
+          `• Для Connected Components: ~${Math.round((targetKeywords.length * (targetKeywords.length - 1)) / 2 / 1000000)} млн. сравнений\n` +
+          `• Для больших датасетов (>30k) рекомендуется DBSCAN\n\n` +
+          `Продолжить кластеризацию?`,
+        "Предупреждение о большом объеме данных",
+        {
+          confirmButtonText: "Продолжить",
+          cancelButtonText: "Отмена",
+          type: "warning",
+          dangerouslyUseHTMLString: false,
+        },
+      );
+    } catch {
+      // User cancelled
+      return;
+    }
+  }
+
   console.log(
     `Clustering ${targetKeywords.length} keywords out of ${allProjectKeywords.length} total`,
   );
@@ -573,7 +598,7 @@ async function handleClusteringRun() {
     }
 
     // Step 3: Update keywords with cluster results (batched for performance)
-    const BATCH_SIZE = 100;
+    const BATCH_SIZE = 1000; // Increased batch size for bulk operations
     const updateBatches = [];
 
     for (let i = 0; i < clusterResults.length; i += BATCH_SIZE) {
@@ -612,10 +637,8 @@ async function handleClusteringRun() {
         })
         .filter((kw) => kw !== null);
 
-      // Update batch in database
-      for (const kw of keywordsToUpdate) {
-        await db.updateKeyword(kw);
-      }
+      // Update batch in database using bulk operation - MUCH faster
+      await db.bulkPutKeywords(keywordsToUpdate);
 
       updatedCount += batch.length;
       keywordsStore.progress = {

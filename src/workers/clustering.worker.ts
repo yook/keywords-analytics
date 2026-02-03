@@ -56,19 +56,24 @@ function cosineDistance(a: number[], b: number[]): number {
 /**
  * Connected Components clustering with progress reporting
  * Groups items where cosine similarity >= threshold
+ * Optimized with batching to prevent UI freezing on large datasets
  */
-function buildClustersWithComponents(
+async function buildClustersWithComponents(
   params: ConnectedComponentsParams,
   messageId: number
-): ClusterResult[] {
+): Promise<ClusterResult[]> {
   const { items, threshold } = params;
   const n = items.length;
   
-  // Build adjacency graph with progress reporting
+  // Build adjacency graph with progress reporting and batching
   const graph = new Map<number, Set<number>>();
   const totalComparisons = (n * (n - 1)) / 2;
   let completedComparisons = 0;
   let lastReportedPercent = 0;
+  
+  // Batch size for yielding control to prevent blocking
+  const COMPARISON_BATCH_SIZE = 5000;
+  let batchComparisons = 0;
   
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
@@ -81,6 +86,14 @@ function buildClustersWithComponents(
       }
       
       completedComparisons++;
+      batchComparisons++;
+      
+      // Yield control every COMPARISON_BATCH_SIZE comparisons to prevent blocking
+      if (batchComparisons >= COMPARISON_BATCH_SIZE) {
+        batchComparisons = 0;
+        // Use setTimeout with 0 delay to yield to event loop
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
       
       // Report progress every 5%
       const currentPercent = Math.floor((completedComparisons / totalComparisons) * 50); // First 50% for graph building
@@ -210,11 +223,12 @@ function buildClustersWithComponents(
 /**
  * DBSCAN clustering with progress reporting
  * Density-based clustering using cosine distance
+ * Optimized with batching to prevent UI freezing on large datasets
  */
-function buildClustersWithDBSCAN(
+async function buildClustersWithDBSCAN(
   params: DBSCANParams,
   messageId: number
-): ClusterResult[] {
+): Promise<ClusterResult[]> {
   const { items, eps, minPts } = params;
   const n = items.length;
   
@@ -223,6 +237,9 @@ function buildClustersWithDBSCAN(
   let currentCluster = 0;
   let processedPoints = 0;
   let lastReportedPercent = 0;
+  
+  // Batch size for yielding control
+  const BATCH_SIZE = 100;
   
   function rangeQuery(pointIdx: number): number[] {
     const neighbors: number[] = [];
@@ -234,9 +251,10 @@ function buildClustersWithDBSCAN(
     return neighbors;
   }
   
-  function expandCluster(pointIdx: number, neighbors: number[]) {
+  async function expandCluster(pointIdx: number, neighbors: number[]) {
     clusterId[pointIdx] = currentCluster;
     const queue = [...neighbors];
+    let expansionCount = 0;
     
     while (queue.length > 0) {
       const q = queue.shift()!;
@@ -250,6 +268,12 @@ function buildClustersWithDBSCAN(
       if (clusterId[q] === -1) {
         clusterId[q] = currentCluster;
       }
+      
+      // Yield control periodically during cluster expansion
+      expansionCount++;
+      if (expansionCount % BATCH_SIZE === 0) {
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
     }
   }
   
@@ -262,11 +286,16 @@ function buildClustersWithDBSCAN(
     if (neighbors.length < minPts) {
       clusterId[i] = -1; // noise
     } else {
-      expandCluster(i, neighbors);
+      await expandCluster(i, neighbors);
       currentCluster++;
     }
     
     processedPoints++;
+    
+    // Yield control periodically
+    if (processedPoints % BATCH_SIZE === 0) {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
     
     // Report progress every 5%
     const currentPercent = Math.floor((processedPoints / n) * 100);
@@ -373,15 +402,15 @@ function calculateConfidence(
 }
 
 // Message handler
-self.onmessage = (event: MessageEvent) => {
+self.onmessage = async (event: MessageEvent) => {
   const { id, type, payload } = event.data;
   
   try {
     if (type === "cluster-components") {
-      const results = buildClustersWithComponents(payload, id);
+      const results = await buildClustersWithComponents(payload, id);
       self.postMessage({ id, type: "result", result: results });
     } else if (type === "cluster-dbscan") {
-      const results = buildClustersWithDBSCAN(payload, id);
+      const results = await buildClustersWithDBSCAN(payload, id);
       self.postMessage({ id, type: "result", result: results });
     } else {
       self.postMessage({ 
