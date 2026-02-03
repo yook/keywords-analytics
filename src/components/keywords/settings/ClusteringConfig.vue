@@ -351,6 +351,8 @@ async function loadEmbeddingsWithCache(
   const missingIndices: number[] = [];
   const missingTexts: string[] = [];
   let cachedCount = 0;
+  let checkedCount = 0;
+  const CACHE_SCAN_BATCH_SIZE = 200;
 
   // Step 1: Check cache first
   for (let i = 0; i < texts.length; i++) {
@@ -362,20 +364,34 @@ async function loadEmbeddingsWithCache(
       missingIndices.push(i);
       missingTexts.push(texts[i]);
     }
-  }
 
-  // Report initial cache hits
-  if (onProgress && cachedCount > 0) {
-    onProgress({
-      fetched: cachedCount,
-      total: texts.length,
-      percent: Math.round((cachedCount / texts.length) * 100),
-      source: "cache",
-    });
+    checkedCount++;
+    if (
+      onProgress &&
+      (checkedCount % CACHE_SCAN_BATCH_SIZE === 0 ||
+        checkedCount === texts.length)
+    ) {
+      onProgress({
+        fetched: cachedCount,
+        total: texts.length,
+        percent: Math.round((checkedCount / texts.length) * 100),
+        source: "cache",
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
   }
 
   // If all found in cache, return
   if (missingTexts.length === 0) {
+    if (onProgress) {
+      onProgress({
+        fetched: cachedCount,
+        total: texts.length,
+        percent: 100,
+        source: "cache",
+      });
+    }
     return results;
   }
 

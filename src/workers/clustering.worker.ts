@@ -95,9 +95,9 @@ async function buildClustersWithComponents(
         await new Promise(resolve => setTimeout(resolve, 0));
       }
       
-      // Report progress every 5%
-      const currentPercent = Math.floor((completedComparisons / totalComparisons) * 50); // First 50% for graph building
-      if (currentPercent > lastReportedPercent && currentPercent % 5 === 0) {
+      // Report progress with finer granularity (0.1%)
+      const currentPercent = Math.round((completedComparisons / totalComparisons) * 500) / 10; // 0..50
+      if (currentPercent > lastReportedPercent) {
         lastReportedPercent = currentPercent;
         // Send progress message
         self.postMessage({
@@ -132,8 +132,8 @@ async function buildClustersWithComponents(
       processedNodes++;
       
       // Report progress
-      const currentPercent = 50 + Math.floor((processedNodes / n) * 50);
-      if (currentPercent > lastReportedPercent && currentPercent % 5 === 0) {
+      const currentPercent = 50 + Math.round((processedNodes / n) * 500) / 10; // 50..100
+      if (currentPercent > lastReportedPercent) {
         lastReportedPercent = currentPercent;
         self.postMessage({
           id: messageId,
@@ -189,8 +189,8 @@ async function buildClustersWithComponents(
     processedNodes += component.length;
     
     // Report progress
-    const currentPercent = 50 + Math.floor((processedNodes / n) * 50);
-    if (currentPercent > lastReportedPercent && currentPercent % 5 === 0) {
+    const currentPercent = 50 + Math.round((processedNodes / n) * 500) / 10; // 50..100
+    if (currentPercent > lastReportedPercent) {
       lastReportedPercent = currentPercent;
       self.postMessage({
         id: messageId,
@@ -298,8 +298,8 @@ async function buildClustersWithDBSCAN(
     }
     
     // Report progress every 5%
-    const currentPercent = Math.floor((processedPoints / n) * 100);
-    if (currentPercent > lastReportedPercent && currentPercent % 5 === 0) {
+    const currentPercent = Math.round((processedPoints / n) * 1000) / 10; // 0..100 with 0.1% precision
+    if (currentPercent > lastReportedPercent) {
       lastReportedPercent = currentPercent;
       self.postMessage({
         id: messageId,
