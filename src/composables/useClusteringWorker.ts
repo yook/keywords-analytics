@@ -133,9 +133,14 @@ export function useClusteringWorker() {
     items: ClusteringItem[],
     eps: number,
     minPts: number,
-    onProgress?: ProgressCallback
+    onProgress?: ProgressCallback,
+    options?: { approximate?: DBSCANParams["approximate"] }
   ): Promise<ClusterResult[]> => {
-    return sendMessage("cluster-dbscan", { items, eps, minPts }, onProgress);
+    return sendMessage(
+      "cluster-dbscan",
+      { items, eps, minPts, approximate: options?.approximate },
+      onProgress
+    );
   };
 
   const terminate = () => {

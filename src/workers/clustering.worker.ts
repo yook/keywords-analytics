@@ -25,6 +25,15 @@ interface DBSCANParams {
   items: ClusteringItem[];
   eps: number;
   minPts: number;
+  approximate?: ApproximateParams;
+}
+
+interface ApproximateParams {
+  method: "lsh";
+  planes?: number;
+  maxCandidates?: number;
+  neighborRings?: number;
+  seed?: number;
 }
 
 // Math helpers
@@ -51,6 +60,115 @@ function cosineSimilarity(a: number[], b: number[]): number {
 
 function cosineDistance(a: number[], b: number[]): number {
   return 1 - cosineSimilarity(a, b);
+}
+
+// --- Approximate Nearest Neighbors (LSH) helpers ---
+type LshIndex = {
+  planes: number;
+  hyperplanes: number[][];
+  buckets: Map<number, number[]>;
+  maxCandidates: number;
+  neighborRings: number;
+};
+
+function createRng(seed = 1337) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 0xffffffff;
+  };
+}
+
+function randomVector(dim: number, rng: () => number): number[] {
+  const v = new Array(dim);
+  for (let i = 0; i < dim; i++) {
+    v[i] = rng() * 2 - 1;
+  }
+  return v;
+}
+
+function lshSignature(vec: number[], hyperplanes: number[][]): number {
+  let sig = 0;
+  for (let i = 0; i < hyperplanes.length; i++) {
+    const plane = hyperplanes[i];
+    let dot = 0;
+    for (let d = 0; d < vec.length; d++) {
+      dot += (vec[d] || 0) * (plane[d] || 0);
+    }
+    if (dot >= 0) sig |= 1 << i;
+  }
+  return sig >>> 0;
+}
+
+async function buildLshIndex(
+  items: ClusteringItem[],
+  options: Required<Pick<ApproximateParams, "planes" | "maxCandidates" | "neighborRings" | "seed">>,
+  messageId: number,
+): Promise<LshIndex> {
+  const dim = items[0]?.embedding?.length || 0;
+  const planes = Math.min(Math.max(options.planes, 8), 20);
+  const rng = createRng(options.seed);
+  const hyperplanes = new Array(planes).fill(0).map(() => randomVector(dim, rng));
+  const buckets = new Map<number, number[]>();
+
+  const total = items.length;
+  let processed = 0;
+  const BATCH_SIZE = 500;
+
+  for (let i = 0; i < items.length; i++) {
+    const sig = lshSignature(items[i].embedding, hyperplanes);
+    const bucket = buckets.get(sig);
+    if (bucket) bucket.push(i);
+    else buckets.set(sig, [i]);
+
+    processed++;
+    if (processed % BATCH_SIZE === 0 || processed === total) {
+      self.postMessage({
+        id: messageId,
+        type: "progress",
+        progress: {
+          stage: "ann_index",
+          percent: Math.round((processed / total) * 1000) / 10,
+          processed,
+          total,
+        },
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+  }
+
+  return {
+    planes,
+    hyperplanes,
+    buckets,
+    maxCandidates: options.maxCandidates,
+    neighborRings: options.neighborRings,
+  };
+}
+
+function getLshCandidates(
+  index: LshIndex,
+  vec: number[],
+): number[] {
+  const sig = lshSignature(vec, index.hyperplanes);
+  const candidates = new Set<number>();
+
+  const direct = index.buckets.get(sig);
+  if (direct) direct.forEach((i) => candidates.add(i));
+
+  if (index.neighborRings >= 1) {
+    for (let b = 0; b < index.planes; b++) {
+      const sig2 = sig ^ (1 << b);
+      const bucket = index.buckets.get(sig2);
+      if (bucket) bucket.forEach((i) => candidates.add(i));
+    }
+  }
+
+  const arr = Array.from(candidates);
+  if (arr.length > index.maxCandidates) {
+    return arr.slice(0, index.maxCandidates);
+  }
+  return arr;
 }
 
 /**
@@ -231,6 +349,21 @@ async function buildClustersWithDBSCAN(
 ): Promise<ClusterResult[]> {
   const { items, eps, minPts } = params;
   const n = items.length;
+
+  const approx = params.approximate?.method === "lsh" ? params.approximate : undefined;
+  let lshIndex: LshIndex | null = null;
+  if (approx) {
+    lshIndex = await buildLshIndex(
+      items,
+      {
+        planes: approx.planes ?? 12,
+        maxCandidates: approx.maxCandidates ?? 400,
+        neighborRings: approx.neighborRings ?? 1,
+        seed: approx.seed ?? 1337,
+      },
+      messageId,
+    );
+  }
   
   const visited = new Array(n).fill(false);
   const clusterId = new Array(n).fill(-1); // -1 = noise
@@ -243,9 +376,21 @@ async function buildClustersWithDBSCAN(
   
   function rangeQuery(pointIdx: number): number[] {
     const neighbors: number[] = [];
-    for (let i = 0; i < n; i++) {
-      if (cosineDistance(items[pointIdx].embedding, items[i].embedding) <= eps) {
-        neighbors.push(i);
+    const candidates = lshIndex
+      ? getLshCandidates(lshIndex, items[pointIdx].embedding)
+      : null;
+
+    if (candidates) {
+      for (const i of candidates) {
+        if (cosineDistance(items[pointIdx].embedding, items[i].embedding) <= eps) {
+          neighbors.push(i);
+        }
+      }
+    } else {
+      for (let i = 0; i < n; i++) {
+        if (cosineDistance(items[pointIdx].embedding, items[i].embedding) <= eps) {
+          neighbors.push(i);
+        }
       }
     }
     return neighbors;

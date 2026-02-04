@@ -68,6 +68,58 @@
             Обычно 2–5.
           </div>
         </el-form-item>
+
+        <el-form-item
+          v-if="form.algorithm === 'dbscan'"
+          label="Approximate Nearest Neighbors (ANN)"
+        >
+          <div class="flex items-center gap-3">
+            <el-switch v-model="annEnabled" />
+            <span class="text-xs text-gray-500">
+              Ускоряет DBSCAN на больших данных (может слегка снижать точность)
+            </span>
+          </div>
+        </el-form-item>
+
+        <el-form-item
+          v-if="form.algorithm === 'dbscan' && annEnabled"
+          label="ANN: количество плоскостей (planes)"
+        >
+          <el-input-number v-model="annPlanes" :min="8" :max="20" :step="1" />
+          <div class="form-helper text-xs text-gray-500 mt-1">
+            Больше плоскостей → точнее, но медленнее индекс.
+          </div>
+        </el-form-item>
+
+        <el-form-item
+          v-if="form.algorithm === 'dbscan' && annEnabled"
+          label="ANN: макс. кандидатов (maxCandidates)"
+        >
+          <el-input-number
+            v-model="annMaxCandidates"
+            :min="100"
+            :max="2000"
+            :step="50"
+          />
+          <div class="form-helper text-xs text-gray-500 mt-1">
+            Лимит проверяемых соседей на точку.
+          </div>
+        </el-form-item>
+
+        <el-form-item
+          v-if="form.algorithm === 'dbscan' && annEnabled"
+          label="ANN: соседние кольца (neighborRings)"
+        >
+          <el-input-number
+            v-model="annNeighborRings"
+            :min="0"
+            :max="2"
+            :step="1"
+          />
+          <div class="form-helper text-xs text-gray-500 mt-1">
+            0 — только своя корзина, 1 — соседние корзины, 2 — шире.
+          </div>
+        </el-form-item>
       </el-form>
 
       <!-- Кнопка запуска кластеризации -->
@@ -205,6 +257,10 @@ const form = ref({
 const thresholdValue = ref(0.8);
 const dbscanEps = ref(0.3);
 const dbscanMinPts = ref(2);
+const annEnabled = ref(true);
+const annPlanes = ref(12);
+const annMaxCandidates = ref(400);
+const annNeighborRings = ref(1);
 
 // Locale-safe number coercion [0,1]
 function toNumber01(x) {
@@ -221,6 +277,10 @@ watch(
     thresholdValue.value,
     dbscanEps.value,
     dbscanMinPts.value,
+    annEnabled.value,
+    annPlanes.value,
+    annMaxCandidates.value,
+    annNeighborRings.value,
   ],
   () => {
     persistToProject();
@@ -238,6 +298,10 @@ function persistToProject() {
     project.data.clustering_algorithm = form.value.algorithm;
     project.data.clustering_dbscan_eps = toNumber01(dbscanEps.value);
     project.data.clustering_dbscan_minPts = Number(dbscanMinPts.value);
+    project.data.clustering_ann_enabled = Boolean(annEnabled.value);
+    project.data.clustering_ann_planes = Number(annPlanes.value);
+    project.data.clustering_ann_maxCandidates = Number(annMaxCandidates.value);
+    project.data.clustering_ann_neighborRings = Number(annNeighborRings.value);
     void project.saveProjectData(projectId);
   } catch (e) {
     console.warn("Failed to persist clustering params to project", e);
@@ -251,11 +315,19 @@ if (project && project.data) {
     const algorithm = project.data.clustering_algorithm;
     const dbscan_eps = project.data.clustering_dbscan_eps;
     const dbscan_minPts = project.data.clustering_dbscan_minPts;
+    const ann_enabled = project.data.clustering_ann_enabled;
+    const ann_planes = project.data.clustering_ann_planes;
+    const ann_maxCandidates = project.data.clustering_ann_maxCandidates;
+    const ann_neighborRings = project.data.clustering_ann_neighborRings;
 
     if (threshold) thresholdValue.value = threshold;
     if (algorithm) form.value.algorithm = String(algorithm);
     if (dbscan_eps) dbscanEps.value = Number(dbscan_eps);
     if (dbscan_minPts) dbscanMinPts.value = Number(dbscan_minPts);
+    if (typeof ann_enabled === "boolean") annEnabled.value = ann_enabled;
+    if (ann_planes) annPlanes.value = Number(ann_planes);
+    if (ann_maxCandidates) annMaxCandidates.value = Number(ann_maxCandidates);
+    if (ann_neighborRings) annNeighborRings.value = Number(ann_neighborRings);
   } catch (e) {
     // ignore
   }
@@ -274,11 +346,21 @@ watch(
       const dbscan_eps = project.data && project.data.clustering_dbscan_eps;
       const dbscan_minPts =
         project.data && project.data.clustering_dbscan_minPts;
+      const ann_enabled = project.data && project.data.clustering_ann_enabled;
+      const ann_planes = project.data && project.data.clustering_ann_planes;
+      const ann_maxCandidates =
+        project.data && project.data.clustering_ann_maxCandidates;
+      const ann_neighborRings =
+        project.data && project.data.clustering_ann_neighborRings;
 
       if (threshold) thresholdValue.value = threshold;
       if (algorithm) form.value.algorithm = String(algorithm);
       if (dbscan_eps) dbscanEps.value = Number(dbscan_eps);
       if (dbscan_minPts) dbscanMinPts.value = Number(dbscan_minPts);
+      if (typeof ann_enabled === "boolean") annEnabled.value = ann_enabled;
+      if (ann_planes) annPlanes.value = Number(ann_planes);
+      if (ann_maxCandidates) annMaxCandidates.value = Number(ann_maxCandidates);
+      if (ann_neighborRings) annNeighborRings.value = Number(ann_neighborRings);
     } catch (e) {}
   },
 );
@@ -585,12 +667,22 @@ async function handleClusteringRun() {
             percent: progress.percent || 0,
           };
           keywordsStore.progress = {
-            stage: "clustering",
+            stage: progress.stage || "dbscan",
             processed: progress.processed || 0,
             total: progress.total || clusteringItems.length,
             percent: progress.percent || 0,
           };
         },
+        annEnabled.value
+          ? {
+              approximate: {
+                method: "lsh",
+                planes: annPlanes.value,
+                maxCandidates: annMaxCandidates.value,
+                neighborRings: annNeighborRings.value,
+              },
+            }
+          : undefined,
       );
     } else {
       clusterResults = await clusteringWorker.clusterWithComponents(

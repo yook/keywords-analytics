@@ -241,6 +241,8 @@ const processLabel = computed(() => {
           return keywordsStore.progress.source === "openai"
             ? "Получение эмбеддингов [OpenAI]"
             : "Загрузка эмбеддингов [кэш]";
+        case "ann_index":
+          return "Построение ANN индекса";
         case "building_graph":
           return "Построение графа сходства";
         case "clustering":

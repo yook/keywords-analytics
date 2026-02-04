@@ -39,7 +39,24 @@ export async function downloadDataFromProject(req: ExportRequest): Promise<strin
     const dbInst = (dexie.dbRef && (dexie.dbRef.value as any)) || null;
     if (dbInst && dbInst[currentDb] && typeof dbInst[currentDb].toArray === 'function') {
       try {
-        data = await dbInst[currentDb].toArray();
+        const table = dbInst[currentDb];
+        // Prefer indexed query by projectId when available
+        if (table && typeof table.where === 'function') {
+          try {
+            data = await table.where('projectId').equals(String(pid)).toArray();
+          } catch (e) {
+            // Fallback to full scan
+            data = await table.toArray();
+          }
+        } else {
+          data = await table.toArray();
+        }
+
+        // Fallback filter if projectId exists in rows
+        if (Array.isArray(data) && data.length > 0 && 'projectId' in data[0]) {
+          data = data.filter((row: any) => String(row.projectId) === String(pid));
+        }
+
         console.log('[Export] Loaded data from Dexie table', currentDb, 'rows', data.length);
       } catch (e) {
         console.warn('[Export] Dexie read failed for', currentDb, e);
@@ -53,6 +70,9 @@ export async function downloadDataFromProject(req: ExportRequest): Promise<strin
   if (!Array.isArray(data) || data.length === 0) {
     try {
       data = await ipcClient.getAllUrlsForExport({ id: pid, db: currentDb, sort: { id: 1 }, skip: 0, limit: 0 });
+      if (Array.isArray(data) && data.length > 0 && 'projectId' in data[0]) {
+        data = data.filter((row: any) => String(row.projectId) === String(pid));
+      }
       console.log('[Export] Loaded data from ipcClient export handler, rows', (Array.isArray(data) && data.length) || 0);
     } catch (err) {
       console.error('[Export] Error fetching data via ipcClient:', err);
@@ -219,7 +239,20 @@ export function downloadKeywords(exportColumns: any[]) {
       await dexie.init();
       const dbInst = (dexie.dbRef && (dexie.dbRef.value as any)) || null;
       if (dbInst && dbInst['keywords'] && typeof dbInst['keywords'].toArray === 'function') {
-        keywordsData = await dbInst['keywords'].toArray();
+        const table = dbInst['keywords'];
+        if (table && typeof table.where === 'function') {
+          try {
+            keywordsData = await table.where('projectId').equals(String(pid)).toArray();
+          } catch (e) {
+            keywordsData = await table.toArray();
+          }
+        } else {
+          keywordsData = await table.toArray();
+        }
+
+        if (Array.isArray(keywordsData) && keywordsData.length > 0 && 'projectId' in keywordsData[0]) {
+          keywordsData = keywordsData.filter((row: any) => String(row.projectId) === String(pid));
+        }
         console.log('[Export] Loaded keywords from Dexie, rows', keywordsData.length);
       }
     } catch (e) {
@@ -232,6 +265,9 @@ export function downloadKeywords(exportColumns: any[]) {
         const kwStore = useKeywordsStore();
         if (Array.isArray(kwStore.keywords) && kwStore.keywords.length > 0) {
           keywordsData = kwStore.keywords.slice();
+          if (Array.isArray(keywordsData) && keywordsData.length > 0 && 'projectId' in keywordsData[0]) {
+            keywordsData = keywordsData.filter((row: any) => String(row.projectId) === String(pid));
+          }
           console.log('[Export] Loaded keywords from keywords store, rows', keywordsData.length);
         }
       } catch (e) {
@@ -242,6 +278,9 @@ export function downloadKeywords(exportColumns: any[]) {
     if (!Array.isArray(keywordsData) || keywordsData.length === 0) {
       try {
         keywordsData = await ipcClient.getKeywordsAll(pid) || [];
+        if (Array.isArray(keywordsData) && keywordsData.length > 0 && 'projectId' in keywordsData[0]) {
+          keywordsData = keywordsData.filter((row: any) => String(row.projectId) === String(pid));
+        }
         console.log('[Export] Loaded keywords from ipcClient, rows', keywordsData.length);
       } catch (e) {
         console.warn('[Export] ipcClient.getKeywordsAll failed', e);

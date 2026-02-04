@@ -74,6 +74,11 @@ export const useProjectStore = defineStore('project', {
       try {
         const db = useDexie()
         await db.init()
+
+        if (!this.projectsList || this.projectsList.length === 0) {
+          console.warn('[ProjectStore] saveProjects skipped: empty projectsList')
+          return
+        }
         
         if (this.currentProjectId) {
           const idx = this.projectsList.findIndex(p => String(p.value) === String(this.currentProjectId))
